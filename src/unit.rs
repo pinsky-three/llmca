@@ -13,12 +13,29 @@ pub struct CognitiveUnit {
 }
 
 impl CognitiveUnit {
-    pub fn calculate_next_state(&self, neighbors: Vec<(String, Vec<String>)>) -> Vec<String> {
-        todo!()
+    pub fn calculate_next_state(&self, neighbors: Vec<(String, Vec<String>)>) -> String {
+        self.llm_model_call(neighbors)
     }
 
-    pub fn llm_model_call(&self) -> String {
-        todo!()
+    pub fn llm_model_call(&self, neighbors: Vec<(String, Vec<String>)>) -> String {
+        let system_message = format!(
+            "rule: {}
+             state: {:?}
+             neighbors: {:?}",
+            self.rule, self.state, neighbors,
+        );
+
+        let input_message = "next_state:".to_string();
+
+        let res = Self::generic_chat_completion(system_message, input_message);
+
+        res.unwrap()
+            .choices
+            .first()
+            .unwrap()
+            .clone()
+            .message
+            .content
     }
 
     fn generic_chat_completion(

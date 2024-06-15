@@ -1,3 +1,5 @@
+use petgraph::stable_graph::StableGraph;
+
 use crate::unit::CognitiveUnit;
 use std::{fmt::Debug, marker::PhantomData};
 
@@ -80,20 +82,20 @@ where
 
                 space.add_unit(unit);
 
-                let s_i = i;
-                let s_j = j;
+                let i_s1 = i.overflowing_sub(1).1.then(|| n - 1).unwrap_or(i);
+                let j_s1 = j.overflowing_sub(1).1.then(|| m - 1).unwrap_or(j);
 
-                let i = i.overflowing_sub(1).1.then(|| n - 1).unwrap_or(i);
-                let j = j.overflowing_sub(1).1.then(|| m - 1).unwrap_or(j);
+                let i_a1 = (i + 1) % n;
+                let j_a1 = (j + 1) % m;
 
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i + 1 % n, j)); // n
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i + 1 % n, j + 1 % m)); // ne
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i, j + 1 % m)); // e
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i - 1 % n, j + 1 % m)); // se
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i - 1 % n, j)); // s
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i - 1 % n, j - 1 % m)); // sw
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i, j - 1 % m)); // w
-                space.add_connection(xy_to_index(s_i, s_j), xy_to_index(i + 1 % n, j - 1 % m));
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_a1, j)); // n
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_a1, j_a1)); // ane
+                space.add_connection(xy_to_index(i, j), xy_to_index(i, j_a1)); // e
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_s1, j_a1)); // se
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_s1, j)); // s
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_s1, j_s1)); // sw
+                space.add_connection(xy_to_index(i, j), xy_to_index(i, j_s1)); // w
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_a1, j_s1));
                 // nw
             }
         }
@@ -113,12 +115,31 @@ where
 
             let neighbors = vec![(from_unit.rule.clone(), from_unit.state.clone())];
 
-            let next_state = to_unit.calculate_next_state(neighbors);
+            let _next_state = to_unit.calculate_next_state(neighbors);
         });
 
         println!(
             "Running cognitive space with rule: {:?}",
             self.rule.get_rule_prompt()
         );
+    }
+
+    pub fn generate_graph(&self) -> StableGraph<(), ()> {
+        let mut nodes = vec![];
+        let mut g = StableGraph::new();
+
+        self.units.iter().for_each(|_unit| {
+            let node = g.add_node(());
+            nodes.push(node);
+        });
+
+        self.connections.iter().for_each(|(from, to)| {
+            let from = nodes[*from];
+            let to = nodes[*to];
+
+            g.add_edge(from, to, ());
+        });
+
+        g
     }
 }
