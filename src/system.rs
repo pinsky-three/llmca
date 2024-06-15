@@ -4,7 +4,13 @@ use std::{fmt::Debug, marker::PhantomData};
 struct CognitiveUnit {
     rule: String,
     state: Vec<String>,
-    neighbors: Vec<(String, Vec<String>)>,
+    // neighbors: Vec<(String, Vec<String>)>,
+}
+
+impl CognitiveUnit {
+    fn calculate_next_state(&self, neighbors: Vec<(String, Vec<String>)>) -> Vec<String> {
+        vec![]
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +47,7 @@ where
 pub trait CognitiveRule {
     fn get_rule_prompt(&self) -> String;
     // fn get_rule_prompt(&self, Vec<String>) -> String;
+    // fn get_rule_prompt(&self, fn(Vec<String>)->String) -> String;
 }
 
 #[derive(Debug, Clone)]
@@ -74,48 +81,34 @@ where
     pub fn new_lattice(n: usize, m: usize, rule: &R) -> CognitiveSpace<R> {
         let mut space = CognitiveSpace::new(Box::new(rule.to_owned()));
 
-        for i in 0..n {
-            for j in 0..m {
+        let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
+
+        for mut i in 0..n {
+            for mut j in 0..m {
                 let rule = rule.get_rule_prompt();
                 let state = vec!["0".to_string()];
-                let neighbors = vec![
-                    ("n".to_string(), vec!["0".to_string()]),
-                    ("ne".to_string(), vec!["0".to_string()]),
-                    ("e".to_string(), vec!["0".to_string()]),
-                    ("se".to_string(), vec!["0".to_string()]),
-                    ("s".to_string(), vec!["0".to_string()]),
-                    ("sw".to_string(), vec!["0".to_string()]),
-                    ("w".to_string(), vec!["0".to_string()]),
-                    ("nw".to_string(), vec!["0".to_string()]),
-                ];
 
-                let unit = CognitiveUnit {
-                    rule,
-                    state,
-                    neighbors,
-                };
+                let unit = CognitiveUnit { rule, state };
 
                 space.add_unit(unit);
-            }
-        }
 
-        for i in 0..n {
-            for j in 0..m {
-                let from = i * m + j;
+                if i < 1 {
+                    i = n - 1;
+                }
 
-                // space.units[from]
-                //     .clone()
-                //     .neighbors
-                //     .iter()
-                //     .for_each(|(_direction, to)| {
-                //         let to = to[0].split('-').collect::<Vec<&str>>();
-                //         let to =
-                //             to[0].parse::<usize>().unwrap() * m + to[1].parse::<usize>().unwrap();
+                if j < 1 {
+                    j = m - 1;
+                }
 
-                //         if to < n * m {
-                //             space.add_connection(from, to);
-                //         }
-                //     });
+                space.add_connection(xy_to_index(i, j), xy_to_index(i + 1 % n, j)); // n
+                space.add_connection(xy_to_index(i, j), xy_to_index(i + 1 % n, j + 1 % m)); // ne
+                space.add_connection(xy_to_index(i, j), xy_to_index(i, j + 1 % m)); // e
+                space.add_connection(xy_to_index(i, j), xy_to_index(i - 1 % n, j + 1 % m)); // se
+                space.add_connection(xy_to_index(i, j), xy_to_index(i - 1 % n, j)); // s
+                space.add_connection(xy_to_index(i, j), xy_to_index(i - 1 % n, j - 1 % m)); // sw
+                space.add_connection(xy_to_index(i, j), xy_to_index(i, j - 1 % m)); // w
+                space.add_connection(xy_to_index(i, j), xy_to_index(i + 1 % n, j - 1 % m));
+                // nw
             }
         }
 
