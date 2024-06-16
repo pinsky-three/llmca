@@ -1,4 +1,7 @@
-use petgraph::stable_graph::StableGraph;
+use petgraph::{
+    stable_graph::{StableGraph, StableUnGraph},
+    Undirected,
+};
 
 use crate::unit::CognitiveUnit;
 use std::{fmt::Debug, marker::PhantomData};
@@ -89,7 +92,7 @@ where
                 let j_a1 = (j + 1) % m;
 
                 space.add_connection(xy_to_index(i, j), xy_to_index(i_a1, j)); // n
-                space.add_connection(xy_to_index(i, j), xy_to_index(i_a1, j_a1)); // ane
+                space.add_connection(xy_to_index(i, j), xy_to_index(i_a1, j_a1)); // ne
                 space.add_connection(xy_to_index(i, j), xy_to_index(i, j_a1)); // e
                 space.add_connection(xy_to_index(i, j), xy_to_index(i_s1, j_a1)); // se
                 space.add_connection(xy_to_index(i, j), xy_to_index(i_s1, j)); // s
@@ -99,6 +102,9 @@ where
                 // nw
             }
         }
+
+        println!("space.connections: {:?}", space.connections.len());
+        println!("space.units: {:?}", space.units.len());
 
         space
     }
@@ -124,9 +130,9 @@ where
         );
     }
 
-    pub fn generate_graph(&self) -> StableGraph<(), ()> {
+    pub fn generate_graph(&self) -> StableGraph<(), (), Undirected> {
         let mut nodes = vec![];
-        let mut g = StableGraph::new();
+        let mut g = StableUnGraph::with_capacity(self.units.len(), self.connections.len());
 
         self.units.iter().for_each(|_unit| {
             let node = g.add_node(());

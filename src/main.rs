@@ -3,10 +3,10 @@ use eframe::{App, CreationContext};
 use egui::Context;
 use egui_graphs::{DefaultEdgeShape, DefaultNodeShape, Graph, GraphView};
 use llmca::system::{CognitiveSpace, MessageModelRule, VonNeumannLatticeCognitiveSpace};
-use petgraph::Directed;
+use petgraph::Undirected;
 
 pub struct BasicApp {
-    g: Graph<(), (), Directed>,
+    g: Graph<(), (), Undirected>,
 }
 
 impl BasicApp {
