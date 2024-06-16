@@ -5,10 +5,11 @@ use serde_json::json;
 
 use crate::api::ChatCompletionResponse;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct CognitiveUnit {
     pub rule: String,
     pub state: Vec<String>,
+    pub position: (usize, usize),
     // neighbors: Vec<(String, Vec<String>)>,
 }
 
