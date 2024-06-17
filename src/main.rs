@@ -1,3 +1,5 @@
+use std::{path::PathBuf, time};
+
 use dotenv::dotenv;
 use itertools::Itertools;
 // use eframe::{App, CreationContext};
@@ -50,19 +52,32 @@ use macroquad::prelude::*;
 //     }
 // }
 
-#[macroquad::main("LLMCA")]
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "LLMCA".to_owned(),
+        window_width: 800,
+        window_height: 800,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     dotenv().ok();
 
-    let rule = MessageModelRule::new(
-        "You're a cell of a game of life automaton. Respond with your next state based on the state of your neighbors.
-        Remember your rules which are: if you're alive and you have 2 or 3 alive neighbors, you stay alive, otherwise you die.
-        if you're dead and you have exactly 3 alive neighbors, you become alive, otherwise you stay dead.".to_string(),
-    );
-
     let (n, m) = (10, 10);
 
-    let initial_states = (0..2).map(|d| d.to_string()).collect_vec();
+    let rule_text = "You're a pixel in a 2d space where are showing a summer sunset.
+        You only know the color of your neighbors and you need to choose your next color based on 
+        the color of your neighbors and your itself. Always choose your next_state as hex color in
+        a sequence (e.g. [\"00ff00\"])."
+        .to_string();
+
+    let rule = MessageModelRule::new(rule_text.clone());
+
+    let initial_states = ["#ff0000", "#00ff00", "#0000ff"]
+        .map(|d| d.to_string())
+        .to_vec();
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
@@ -86,13 +101,24 @@ async fn main() {
 
     //
     //
+    let hash = md5::compute(rule_text.as_bytes());
+    let hash_string = format!("{:x}", hash);
+
+    let timestamp = time::SystemTime::now()
+        .duration_since(time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let folder_name = PathBuf::from("saves")
+        .join(hash_string)
+        .join(format!("{}", timestamp));
+
+    std::fs::create_dir_all(folder_name.clone()).unwrap();
 
     loop {
         println!("\nstep: {}", step);
 
         // space.print_nodes_state();
-
-        step += 1;
 
         //
         //
@@ -109,8 +135,9 @@ async fn main() {
         let states_to_colors = unique_states
             .iter()
             .sorted()
-            .enumerate()
-            .map(|(i, state)| (state, get_color_by_index(i)))
+            // .enumerate()
+            // .map(|(_i, state)| (state, get_color_from_hex_string(state)))
+            .map(|state| (state, get_color_from_hex_string(state)))
             .collect::<std::collections::HashMap<_, _>>();
 
         println!(
@@ -142,9 +169,22 @@ async fn main() {
 
         // draw_text("HELLO", 20.0, 20.0, 30.0, DARKGRAY);
 
+        let screen_image = get_screen_data().bytes;
+
+        image::save_buffer(
+            folder_name.join(format!("{}.png", step)),
+            &screen_image,
+            screen_width() as u32,
+            screen_height() as u32,
+            image::ColorType::Rgba8,
+        )
+        .unwrap();
+
         next_frame().await;
 
         space.sync_step();
+
+        step += 1;
     }
 
     // let native_options = eframe::NativeOptions::default();
@@ -157,10 +197,25 @@ async fn main() {
     // .unwrap();
 }
 
-fn get_color_by_index(index: usize) -> Color {
-    [
-        LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN,
-        SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK,
-        BLANK, MAGENTA,
-    ][index % 25]
+// fn get_color_by_index(index: usize) -> Color {
+//     [
+//         LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN,
+//         SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK,
+//         BLANK, MAGENTA,
+//     ][index % 25]
+// }
+
+fn get_color_from_hex_string(hex: &str) -> Color {
+    let hex = hex
+        .trim_matches('[')
+        .trim_matches('"')
+        .trim_matches(']')
+        .trim_matches('#')
+        .to_lowercase();
+
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap();
+
+    Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0)
 }
