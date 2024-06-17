@@ -55,16 +55,16 @@ async fn main() {
     dotenv().ok();
 
     let rule = MessageModelRule::new(
-        "You're a cellular automaton with game of life behavior. 
-                Response with your next state based on the state of your neighbors.
-                Don't response with explanations or nothing else, only your state.
-                Always respond with a single state and ignoring the rest."
-            .to_string(),
+        "You're a cell of a game of life automaton. Respond with your next state based on the state of your neighbors.
+        Remember your rules which are: if you're alive and you have 2 or 3 alive neighbors, you stay alive, otherwise you die.
+        if you're dead and you have exactly 3 alive neighbors, you become alive, otherwise you stay dead.".to_string(),
     );
 
-    let (n, m) = (3, 3);
+    let (n, m) = (10, 10);
 
-    let mut space = VonNeumannLatticeCognitiveSpace::new_lattice(n, m, rule);
+    let initial_states = (0..2).map(|d| d.to_string()).collect_vec();
+
+    let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
     let mut step = 0;
 
@@ -101,7 +101,7 @@ async fn main() {
         let all_states = space
             .get_units()
             .iter()
-            .map(|u| u.state.first().unwrap().to_owned())
+            .map(|u| serde_json::to_string(&u.state).unwrap())
             .collect::<Vec<_>>();
 
         let unique_states = all_states.iter().collect::<std::collections::HashSet<_>>();
@@ -119,7 +119,8 @@ async fn main() {
         );
 
         space.get_units().iter().for_each(|unit| {
-            let state = unit.state.first().unwrap();
+            let state = &serde_json::to_string(&unit.state).unwrap();
+
             let (p_x, p_y) = unit.position;
 
             let color = states_to_colors.get(&state).unwrap();
