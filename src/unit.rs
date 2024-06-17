@@ -45,7 +45,7 @@ impl CognitiveUnit {
         user_message: String,
     ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
         let open_ai_key = env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string());
-        let model_name = env::var("OPENAI_MODEL_NAME").unwrap_or("phi".to_string());
+        let model_name = env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string());
 
         let mut headers = header::HeaderMap::new();
 
@@ -69,15 +69,13 @@ impl CognitiveUnit {
             ]
         });
 
-        let res = client
+        Ok(client
+            // .post("https://openrouter.ai/api/v1/chat/completions")
             .post("http://localhost:11434/v1/chat/completions")
             .headers(headers)
             .body(body.to_string())
             .send()
             .unwrap()
-            .json::<ChatCompletionResponse>()
-            .unwrap();
-
-        Ok(res)
+            .json::<ChatCompletionResponse>()?)
     }
 }

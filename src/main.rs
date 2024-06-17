@@ -1,4 +1,5 @@
 use dotenv::dotenv;
+use itertools::Itertools;
 // use eframe::{App, CreationContext};
 // use egui::Context;
 // use egui_graphs::{
@@ -49,21 +50,22 @@ use macroquad::prelude::*;
 //     }
 // }
 
-#[macroquad::main("Life")]
+#[macroquad::main("LLMCA")]
 async fn main() {
     dotenv().ok();
 
     let rule = MessageModelRule::new(
-        "you're a simple cellular automaton with game of life behavior, 
-                response only with the next state without explanations. always try to
-                reduce your state to the minimum possible. if you have an state different to
-                0 or 1, you're wrong. if you have more than one state, you're wrong. if the state
-                of your neighbors is not 0 or 1, resolve your state in correct manner. Remember, 
-                you have limited resources, so be efficient at save your state."
+        "you're a game of life cell. you have a state, and you have neighbors.
+                response only with the next state without explanations. 
+                always try to reduce your state to the minimum possible. 
+                if you have an state different to 0 or 1, you're wrong. 
+                if you have more than one state, you're wrong.
+                if the state of your neighbors is not 0 or 1, you should to return 0 or 1.
+                you have limited context window, so you need always to reduce your state to the minimum possible."
             .to_string(),
     );
 
-    let (n, m) = (10, 10);
+    let (n, m) = (5, 5);
 
     let mut space = VonNeumannLatticeCognitiveSpace::new_lattice(n, m, rule);
 
@@ -107,13 +109,17 @@ async fn main() {
 
         let unique_states = all_states.iter().collect::<std::collections::HashSet<_>>();
 
-        println!("unique_states: {:?}", unique_states);
-
         let states_to_colors = unique_states
             .iter()
+            .sorted()
             .enumerate()
             .map(|(i, state)| (state, get_color_by_index(i)))
             .collect::<std::collections::HashMap<_, _>>();
+
+        println!(
+            "states: {:?}",
+            states_to_colors.keys().sorted().collect::<Vec<_>>()
+        );
 
         space.get_units().iter().for_each(|unit| {
             let state = unit.state.first().unwrap();
