@@ -18,16 +18,12 @@ impl CognitiveUnit {
     }
 
     pub fn llm_model_call(&self, neighbors: Vec<(String, Vec<String>)>) -> String {
-        let system_message = format!(
-            "rule: {}
-             state: {:?}
-             neighbors: {:?}",
-            self.rule, self.state, neighbors,
+        let system_message = format!("{{ \"rule\": {:?} }}", self.rule);
+
+        let input_message = format!(
+            "{{ \"neighbors\": {:?}, \"state\": {:?} }}",
+            neighbors, self.state
         );
-
-        // println!("system_message: {:?}", system_message);
-
-        let input_message = "next_state: ".to_string();
 
         let res = Self::generic_chat_completion(system_message, input_message);
 

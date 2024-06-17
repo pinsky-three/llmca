@@ -209,10 +209,7 @@ where
                 .map(|neighbor| {
                     let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
 
-                    (
-                        format!("n_{}", neighbor.index()),
-                        neighbor_unit.state.clone(),
-                    )
+                    ("-".to_string(), neighbor_unit.state.clone())
                 })
                 .collect();
 

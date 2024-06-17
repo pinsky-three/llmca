@@ -55,17 +55,14 @@ async fn main() {
     dotenv().ok();
 
     let rule = MessageModelRule::new(
-        "you're a game of life cell. you have a state, and you have neighbors.
-                response only with the next state without explanations. 
-                always try to reduce your state to the minimum possible. 
-                if you have an state different to 0 or 1, you're wrong. 
-                if you have more than one state, you're wrong.
-                if the state of your neighbors is not 0 or 1, you should to return 0 or 1.
-                you have limited context window, so you need always to reduce your state to the minimum possible."
+        "You're a cellular automaton with game of life behavior. 
+                Response with your next state based on the state of your neighbors.
+                Don't response with explanations or nothing else, only your state.
+                Always respond with a single state and ignoring the rest."
             .to_string(),
     );
 
-    let (n, m) = (5, 5);
+    let (n, m) = (3, 3);
 
     let mut space = VonNeumannLatticeCognitiveSpace::new_lattice(n, m, rule);
 
