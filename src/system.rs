@@ -3,7 +3,7 @@ use petgraph::{stable_graph::StableGraph, Undirected};
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::unit::CognitiveUnit;
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct CognitiveSpace<R>
@@ -64,14 +64,22 @@ pub struct VonNeumannLatticeCognitiveSpace<R>
 where
     R: CognitiveRule + Debug + Clone,
 {
-    _rule: PhantomData<R>,
+    rule: Box<R>,
+    initial_states: Vec<String>,
 }
 
 impl<R> VonNeumannLatticeCognitiveSpace<R>
 where
     R: CognitiveRule + Debug + Clone,
 {
-    pub fn new_lattice(n: usize, m: usize, rule: R) -> CognitiveSpace<R> {
+    pub fn new(rule: R, initial_states: Vec<String>) -> Self {
+        Self {
+            rule: Box::new(rule),
+            initial_states,
+        }
+    }
+
+    pub fn build_lattice(&self, n: usize, m: usize) -> CognitiveSpace<R> {
         // let mut space = CognitiveSpace::new(Box::new(rule.clone()));
         let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
 
@@ -83,8 +91,8 @@ where
         let (nodes, positions): (Vec<_>, Vec<_>) = (0..n)
             .cartesian_product(0..m)
             .map(|position| {
-                let state = vec![["0", "1"].choose(&mut rng).unwrap().to_string()];
-                let rule = rule.get_rule_prompt();
+                let state = vec![self.initial_states.choose(&mut rng).unwrap().to_string()];
+                let rule = self.rule.get_rule_prompt();
                 let unit = CognitiveUnit {
                     rule,
                     state,
@@ -145,7 +153,7 @@ where
         });
 
         CognitiveSpace {
-            _rule: Box::new(rule),
+            _rule: self.rule.clone(),
             graph,
         }
     }
@@ -163,7 +171,10 @@ where
                 .map(|neighbor| {
                     let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
 
-                    ("-".to_string(), neighbor_unit.state.clone())
+                    (
+                        format!("n_{}", neighbor.index()),
+                        neighbor_unit.state.clone(),
+                    )
                 })
                 .collect();
 
@@ -172,7 +183,7 @@ where
 
             // println!("next_state: {:?}", next_state);
 
-            unit.state = vec![next_state];
+            unit.state = next_state;
         });
     }
 
