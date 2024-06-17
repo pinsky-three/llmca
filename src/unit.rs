@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, time::Duration};
 
 use reqwest::header;
 use serde_json::json;
@@ -10,7 +10,6 @@ pub struct CognitiveUnit {
     pub rule: String,
     pub state: Vec<String>,
     pub position: (usize, usize),
-    // neighbors: Vec<(String, Vec<String>)>,
 }
 
 impl CognitiveUnit {
@@ -26,7 +25,9 @@ impl CognitiveUnit {
             self.rule, self.state, neighbors,
         );
 
-        let input_message = "next_state:".to_string();
+        // println!("system_message: {:?}", system_message);
+
+        let input_message = "next_state: ".to_string();
 
         let res = Self::generic_chat_completion(system_message, input_message);
 
@@ -43,8 +44,8 @@ impl CognitiveUnit {
         system_message: String,
         user_message: String,
     ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
-        let open_ai_key = env::var("OPENAI_API_KEY").unwrap();
-        let model_name = env::var("OPENAI_MODEL_NAME").unwrap_or("gpt-3.5-turbo".to_string());
+        let open_ai_key = env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string());
+        let model_name = env::var("OPENAI_MODEL_NAME").unwrap_or("phi".to_string());
 
         let mut headers = header::HeaderMap::new();
 
@@ -55,6 +56,7 @@ impl CognitiveUnit {
         );
 
         let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(120))
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .unwrap();
@@ -68,7 +70,7 @@ impl CognitiveUnit {
         });
 
         let res = client
-            .post("https://openrouter.ai/api/v1/chat/completions")
+            .post("http://localhost:11434/v1/chat/completions")
             .headers(headers)
             .body(body.to_string())
             .send()

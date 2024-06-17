@@ -1,66 +1,162 @@
 use dotenv::dotenv;
-use eframe::{App, CreationContext};
-use egui::Context;
-use egui_graphs::{
-    DefaultEdgeShape, DefaultNodeShape, Graph, GraphView, SettingsInteraction, SettingsNavigation,
-    SettingsStyle,
-};
+// use eframe::{App, CreationContext};
+// use egui::Context;
+// use egui_graphs::{
+//     DefaultEdgeShape, DefaultNodeShape, Graph, GraphView, SettingsInteraction, SettingsNavigation,
+//     SettingsStyle,
+// };
 use llmca::{
-    system::{CognitiveSpace, MessageModelRule, VonNeumannLatticeCognitiveSpace},
-    unit::CognitiveUnit,
+    system::{MessageModelRule, VonNeumannLatticeCognitiveSpace},
+    // unit::CognitiveUnit,
 };
-use petgraph::Undirected;
+// use petgraph::Undirected;
 
-pub struct BasicApp {
-    g: Graph<CognitiveUnit, (), Undirected>,
-}
+// pub struct BasicApp {
+//     g: Graph<CognitiveUnit, (), Undirected>,
+// }
 
-impl BasicApp {
-    fn new(_: &CreationContext<'_>, space: CognitiveSpace<MessageModelRule>) -> Self {
-        let g = space.generate_graph();
+use macroquad::prelude::*;
 
-        Self {
-            g: Graph::<CognitiveUnit, (), Undirected>::from(&g),
-        }
-    }
-}
+// impl BasicApp {
+//     fn new(_: &CreationContext<'_>, space: CognitiveSpace<MessageModelRule>) -> Self {
+//         let g = space.generate_graph();
 
-impl App for BasicApp {
-    fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add(
-                &mut GraphView::<_, _, _, _, DefaultNodeShape, DefaultEdgeShape>::new(&mut self.g)
-                    .with_styles(&SettingsStyle::new().with_labels_always(true))
-                    .with_navigations(
-                        &SettingsNavigation::default()
-                            .with_fit_to_screen_enabled(false)
-                            .with_zoom_and_pan_enabled(true),
-                    )
-                    .with_interactions(
-                        &SettingsInteraction::new()
-                            .with_dragging_enabled(true)
-                            .with_node_clicking_enabled(true)
-                            .with_node_selection_enabled(true),
-                    ),
-            );
-        });
-    }
-}
+//         Self {
+//             g: Graph::<CognitiveUnit, (), Undirected>::from(&g),
+//         }
+//     }
+// }
 
-fn main() {
+// impl App for BasicApp {
+//     fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
+//         egui::CentralPanel::default().show(ctx, |ui| {
+//             ui.add(
+//                 &mut GraphView::<_, _, _, _, DefaultNodeShape, DefaultEdgeShape>::new(&mut self.g)
+//                     .with_styles(&SettingsStyle::new().with_labels_always(true))
+//                     .with_navigations(
+//                         &SettingsNavigation::default()
+//                             .with_fit_to_screen_enabled(false)
+//                             .with_zoom_and_pan_enabled(true),
+//                     )
+//                     .with_interactions(
+//                         &SettingsInteraction::new()
+//                             .with_dragging_enabled(true)
+//                             .with_node_clicking_enabled(true)
+//                             .with_node_selection_enabled(true),
+//                     ),
+//             );
+//         });
+//     }
+// }
+
+#[macroquad::main("Life")]
+async fn main() {
     dotenv().ok();
 
-    let rule = MessageModelRule::new("Hello, world!".to_string());
-    let space = VonNeumannLatticeCognitiveSpace::new_lattice(3, 3, rule);
+    let rule = MessageModelRule::new(
+        "you're a simple cellular automaton with game of life behavior, 
+                response only with the next state without explanations. always try to
+                reduce your state to the minimum possible. if you have an state different to
+                0 or 1, you're wrong. if you have more than one state, you're wrong. if the state
+                of your neighbors is not 0 or 1, resolve your state in correct manner. Remember, 
+                you have limited resources, so be efficient at save your state."
+            .to_string(),
+    );
 
-    println!("{:?}", space);
+    let (n, m) = (10, 10);
 
-    let native_options = eframe::NativeOptions::default();
+    let mut space = VonNeumannLatticeCognitiveSpace::new_lattice(n, m, rule);
 
-    eframe::run_native(
-        "egui_graphs_basic_demo",
-        native_options,
-        Box::new(|cc| Box::new(BasicApp::new(cc, space))),
-    )
-    .unwrap();
+    let mut step = 0;
+
+    //
+    //
+
+    // let mut cells = vec![CellState::Dead; w * h];
+    // let mut buffer = vec![CellState::Dead; w * h];
+
+    // let mut image = Image::gen_image_color(w as u16, h as u16, WHITE);
+
+    // for cell in cells.iter_mut() {
+    //     if rand::gen_range(0, 5) == 0 {
+    //         *cell = CellState::Alive;
+    //     }
+    // }
+
+    // let texture = Texture2D::from_image(&image);
+
+    //
+    //
+
+    loop {
+        println!("\nstep: {}", step);
+
+        // space.print_nodes_state();
+
+        step += 1;
+
+        //
+        //
+        //
+
+        let all_states = space
+            .get_units()
+            .iter()
+            .map(|u| u.state.first().unwrap().to_owned())
+            .collect::<Vec<_>>();
+
+        let unique_states = all_states.iter().collect::<std::collections::HashSet<_>>();
+
+        println!("unique_states: {:?}", unique_states);
+
+        let states_to_colors = unique_states
+            .iter()
+            .enumerate()
+            .map(|(i, state)| (state, get_color_by_index(i)))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        space.get_units().iter().for_each(|unit| {
+            let state = unit.state.first().unwrap();
+            let (p_x, p_y) = unit.position;
+
+            let color = states_to_colors.get(&state).unwrap();
+
+            let cell_size = (screen_width() / n as f32).min(screen_height() / m as f32);
+
+            draw_rectangle(
+                p_x as f32 * cell_size,
+                p_y as f32 * cell_size,
+                cell_size,
+                cell_size,
+                *color,
+            );
+        });
+
+        // draw_line(40.0, 40.0, 100.0, 200.0, 15.0, BLUE);
+        // draw_rectangle(screen_width() / 2.0 - 60.0, 100.0, 120.0, 60.0, GREEN);
+        // draw_circle(screen_width() - 30.0, screen_height() - 30.0, 15.0, YELLOW);
+
+        // draw_text("HELLO", 20.0, 20.0, 30.0, DARKGRAY);
+
+        next_frame().await;
+
+        space.sync_step();
+    }
+
+    // let native_options = eframe::NativeOptions::default();
+
+    // eframe::run_native(
+    //     "egui_graphs_basic_demo",
+    //     native_options,
+    //     Box::new(|cc| Box::new(BasicApp::new(cc, space))),
+    // )
+    // .unwrap();
+}
+
+fn get_color_by_index(index: usize) -> Color {
+    [
+        LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN,
+        SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK,
+        BLANK, MAGENTA,
+    ][index % 25]
 }

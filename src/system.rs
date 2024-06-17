@@ -1,11 +1,6 @@
 use itertools::Itertools;
-use petgraph::{
-    graph::NodeIndex,
-    matrix_graph::{MatrixGraph, UnMatrix},
-    stable_graph::{StableGraph, StableUnGraph},
-    visit::IntoEdges,
-    Undirected,
-};
+use petgraph::{stable_graph::StableGraph, Undirected};
+use rand::{seq::SliceRandom, thread_rng};
 
 use crate::unit::CognitiveUnit;
 use std::{fmt::Debug, marker::PhantomData};
@@ -17,7 +12,7 @@ where
 {
     // units: Vec<CognitiveUnit>,
     // connections: Vec<(usize, usize)>,
-    rule: Box<R>,
+    _rule: Box<R>,
     graph: StableGraph<CognitiveUnit, (), Undirected>,
 }
 
@@ -80,13 +75,15 @@ where
         // let mut space = CognitiveSpace::new(Box::new(rule.clone()));
         let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
 
+        let mut rng = thread_rng();
+
         let mut graph =
             StableGraph::<CognitiveUnit, (), Undirected>::with_capacity(n * m, 4 * n * m);
 
         let (nodes, positions): (Vec<_>, Vec<_>) = (0..n)
             .cartesian_product(0..m)
             .map(|position| {
-                let state = vec!["0".to_string()];
+                let state = vec![["0", "1"].choose(&mut rng).unwrap().to_string()];
                 let rule = rule.get_rule_prompt();
                 let unit = CognitiveUnit {
                     rule,
@@ -106,24 +103,44 @@ where
             let j_a1 = (j + 1) % m;
 
             let n_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j)]);
+            let ne_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j_a1)]);
             let e_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i, j_a1)]);
+            let se_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j_a1)]);
             let s_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j)]);
+            let sw_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j_s1)]);
             let w_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i, j_s1)]);
+            let nw_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j_s1)]);
 
             if !graph.contains_edge(n_edge.0, n_edge.1) && n_edge.0 != n_edge.1 {
                 graph.add_edge(n_edge.0, n_edge.1, ());
+            }
+
+            if !graph.contains_edge(ne_edge.0, ne_edge.1) && ne_edge.0 != ne_edge.1 {
+                graph.add_edge(ne_edge.0, ne_edge.1, ());
             }
 
             if !graph.contains_edge(e_edge.0, e_edge.1) && e_edge.0 != e_edge.1 {
                 graph.add_edge(e_edge.0, e_edge.1, ());
             }
 
+            if !graph.contains_edge(se_edge.0, se_edge.1) && se_edge.0 != se_edge.1 {
+                graph.add_edge(se_edge.0, se_edge.1, ());
+            }
+
             if !graph.contains_edge(s_edge.0, s_edge.1) && s_edge.0 != s_edge.1 {
                 graph.add_edge(s_edge.0, s_edge.1, ());
             }
 
+            if !graph.contains_edge(sw_edge.0, sw_edge.1) && sw_edge.0 != sw_edge.1 {
+                graph.add_edge(sw_edge.0, sw_edge.1, ());
+            }
+
             if !graph.contains_edge(w_edge.0, w_edge.1) && w_edge.0 != w_edge.1 {
                 graph.add_edge(w_edge.0, w_edge.1, ());
+            }
+
+            if !graph.contains_edge(nw_edge.0, nw_edge.1) && nw_edge.0 != nw_edge.1 {
+                graph.add_edge(nw_edge.0, nw_edge.1, ());
             }
         });
 
@@ -153,12 +170,12 @@ where
         // println!("space.connections: {:?}", space.connections.len());
         // println!("space.units: {:?}", sp,ace.units.len());
 
-        graph.edges(nodes[0]).for_each(|edge| {
-            println!("edge: {:?}", edge);
-        });
+        // graph.edges(nodes[0]).for_each(|edge| {
+        //     println!("edge: {:?}", edge);
+        // });
 
         CognitiveSpace {
-            rule: Box::new(rule),
+            _rule: Box::new(rule),
             graph,
         }
     }
@@ -184,6 +201,34 @@ where
     //     );
     // }
 
+    pub fn sync_step(&mut self) {
+        self.graph.clone().node_indices().for_each(|node| {
+            let neighbors = self
+                .graph
+                .neighbors(node)
+                .map(|neighbor| {
+                    let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
+
+                    ("-".to_string(), neighbor_unit.state.clone())
+                })
+                .collect();
+
+            let unit = self.graph.node_weight_mut(node).unwrap();
+            let next_state = unit.calculate_next_state(neighbors);
+
+            // println!("next_state: {:?}", next_state);
+
+            unit.state = vec![next_state];
+        });
+    }
+
+    pub fn print_nodes_state(&self) {
+        self.graph.node_indices().for_each(|node| {
+            let unit = self.graph.node_weight(node).unwrap();
+            println!("unit: {:?}", unit.state);
+        });
+    }
+
     pub fn generate_graph(&self) -> StableGraph<CognitiveUnit, (), Undirected> {
         // let mut nodes = vec![];
         // let mut g = StableUnGraph::with_capacity(self.units.len(), self.connections.len());
@@ -201,5 +246,9 @@ where
         // });
 
         self.graph.clone()
+    }
+
+    pub fn get_units(&self) -> Vec<CognitiveUnit> {
+        self.graph.node_weights().cloned().collect()
     }
 }
