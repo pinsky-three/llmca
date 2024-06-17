@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use kdam::tqdm;
 use petgraph::{stable_graph::StableGraph, Undirected};
 use rand::{seq::SliceRandom, thread_rng};
 
@@ -164,7 +165,10 @@ where
     R: CognitiveRule + Debug + Clone,
 {
     pub fn sync_step(&mut self) {
-        self.graph.clone().node_indices().for_each(|node| {
+        let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
+
+        for i in tqdm!(0..nodes.len()) {
+            let node = nodes[i];
             let neighbors = self
                 .graph
                 .neighbors(node)
@@ -184,7 +188,10 @@ where
             // println!("next_state: {:?}", next_state);
 
             unit.state = next_state;
-        });
+        }
+        // .for_each(|node| {
+
+        // });
     }
 
     pub fn print_nodes_state(&self) {

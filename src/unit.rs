@@ -71,6 +71,9 @@ impl CognitiveUnit {
         {
             \"next_state\": [\"1\"]
         }
+
+        Be careful with your response, it should be a valid json with the next_state field.
+        Take care of trailing characters, spaces, and new lines.
         "
         .to_string();
 
@@ -129,13 +132,16 @@ impl CognitiveUnit {
             ]
         });
 
-        Ok(client
+        let res = client
             // .post("https://openrouter.ai/api/v1/chat/completions")
             .post("http://localhost:11434/v1/chat/completions")
             .headers(headers)
             .body(body.to_string())
             .send()
-            .unwrap()
-            .json::<ChatCompletionResponse>()?)
+            .unwrap();
+
+        let parsed_res = res.json::<ChatCompletionResponse>().unwrap();
+
+        Ok(parsed_res)
     }
 }
