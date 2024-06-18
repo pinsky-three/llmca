@@ -11,31 +11,8 @@ pub struct CognitiveSpace<R>
 where
     R: CognitiveRule,
 {
-    // units: Vec<CognitiveUnit>,
-    // connections: Vec<(usize, usize)>,
     _rule: Box<R>,
     graph: StableGraph<CognitiveUnit, (), Undirected>,
-}
-
-impl<R> CognitiveSpace<R>
-where
-    R: CognitiveRule + Debug + Clone,
-{
-    // pub fn new(rule: Box<R>) -> Self {
-    //     Self {
-    //         units: vec![],
-    //         connections: vec![],
-    //         rule,
-    //     }
-    // }
-
-    // fn add_unit(&mut self, unit: CognitiveUnit) {
-    //     self.units.push(unit);
-    // }
-
-    // fn add_connection(&mut self, from: usize, to: usize) {
-    //     self.connections.push((from, to));
-    // }
 }
 
 pub trait CognitiveRule {
@@ -87,7 +64,7 @@ where
         let mut rng = thread_rng();
 
         let mut graph =
-            StableGraph::<CognitiveUnit, (), Undirected>::with_capacity(n * m, 4 * n * m);
+            StableGraph::<CognitiveUnit, (), Undirected>::with_capacity(n * m, 8 * n * m);
 
         let (nodes, positions): (Vec<_>, Vec<_>) = (0..n)
             .cartesian_product(0..m)

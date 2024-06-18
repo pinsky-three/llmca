@@ -2,55 +2,10 @@ use std::{path::PathBuf, time};
 
 use dotenv::dotenv;
 use itertools::Itertools;
-// use eframe::{App, CreationContext};
-// use egui::Context;
-// use egui_graphs::{
-//     DefaultEdgeShape, DefaultNodeShape, Graph, GraphView, SettingsInteraction, SettingsNavigation,
-//     SettingsStyle,
-// };
-use llmca::{
-    system::{MessageModelRule, VonNeumannLatticeCognitiveSpace},
-    // unit::CognitiveUnit,
-};
-// use petgraph::Undirected;
 
-// pub struct BasicApp {
-//     g: Graph<CognitiveUnit, (), Undirected>,
-// }
+use llmca::system::{MessageModelRule, VonNeumannLatticeCognitiveSpace};
 
 use macroquad::prelude::*;
-
-// impl BasicApp {
-//     fn new(_: &CreationContext<'_>, space: CognitiveSpace<MessageModelRule>) -> Self {
-//         let g = space.generate_graph();
-
-//         Self {
-//             g: Graph::<CognitiveUnit, (), Undirected>::from(&g),
-//         }
-//     }
-// }
-
-// impl App for BasicApp {
-//     fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
-//         egui::CentralPanel::default().show(ctx, |ui| {
-//             ui.add(
-//                 &mut GraphView::<_, _, _, _, DefaultNodeShape, DefaultEdgeShape>::new(&mut self.g)
-//                     .with_styles(&SettingsStyle::new().with_labels_always(true))
-//                     .with_navigations(
-//                         &SettingsNavigation::default()
-//                             .with_fit_to_screen_enabled(false)
-//                             .with_zoom_and_pan_enabled(true),
-//                     )
-//                     .with_interactions(
-//                         &SettingsInteraction::new()
-//                             .with_dragging_enabled(true)
-//                             .with_node_clicking_enabled(true)
-//                             .with_node_selection_enabled(true),
-//                     ),
-//             );
-//         });
-//     }
-// }
 
 fn window_conf() -> Conf {
     Conf {
@@ -65,9 +20,10 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (10, 10);
+    let (n, m) = (20, 20);
 
-    let rule_text = "You're a pixel in a 2d space where are showing a summer sunset.
+    let rule_text = "You're a pixel in a image where are showing a summer sunset.
+        The most important think is try to be stable and don't change your color too much.
         You only know the color of your neighbors and you need to choose your next color based on 
         the color of your neighbors and your itself. Always choose your next_state as hex color in
         a sequence (e.g. [\"00ff00\"])."
@@ -83,24 +39,6 @@ async fn main() {
 
     let mut step = 0;
 
-    //
-    //
-
-    // let mut cells = vec![CellState::Dead; w * h];
-    // let mut buffer = vec![CellState::Dead; w * h];
-
-    // let mut image = Image::gen_image_color(w as u16, h as u16, WHITE);
-
-    // for cell in cells.iter_mut() {
-    //     if rand::gen_range(0, 5) == 0 {
-    //         *cell = CellState::Alive;
-    //     }
-    // }
-
-    // let texture = Texture2D::from_image(&image);
-
-    //
-    //
     let hash = md5::compute(rule_text.as_bytes());
     let hash_string = format!("{:x}", hash);
 
@@ -117,12 +55,6 @@ async fn main() {
 
     loop {
         println!("\nstep: {}", step);
-
-        // space.print_nodes_state();
-
-        //
-        //
-        //
 
         let all_states = space
             .get_units()
@@ -163,12 +95,6 @@ async fn main() {
             );
         });
 
-        // draw_line(40.0, 40.0, 100.0, 200.0, 15.0, BLUE);
-        // draw_rectangle(screen_width() / 2.0 - 60.0, 100.0, 120.0, 60.0, GREEN);
-        // draw_circle(screen_width() - 30.0, screen_height() - 30.0, 15.0, YELLOW);
-
-        // draw_text("HELLO", 20.0, 20.0, 30.0, DARKGRAY);
-
         let screen_image = get_screen_data().bytes;
 
         image::save_buffer(
@@ -186,15 +112,6 @@ async fn main() {
 
         step += 1;
     }
-
-    // let native_options = eframe::NativeOptions::default();
-
-    // eframe::run_native(
-    //     "egui_graphs_basic_demo",
-    //     native_options,
-    //     Box::new(|cc| Box::new(BasicApp::new(cc, space))),
-    // )
-    // .unwrap();
 }
 
 // fn get_color_by_index(index: usize) -> Color {
@@ -206,12 +123,11 @@ async fn main() {
 // }
 
 fn get_color_from_hex_string(hex: &str) -> Color {
-    let hex = hex
-        .trim_matches('[')
-        .trim_matches('"')
-        .trim_matches(']')
-        .trim_matches('#')
-        .to_lowercase();
+    let hex = hex.trim_matches(&['#', '"', '[', ']']).to_lowercase();
+
+    if hex.len() != 6 {
+        return Color::new(0.0, 0.0, 0.0, 1.0);
+    }
 
     let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
     let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
