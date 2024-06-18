@@ -20,20 +20,21 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (20, 20);
+    let (n, m) = (5, 5);
 
-    let rule_text = "You're a pixel in a image where are showing a summer sunset.
-        The most important think is try to be stable and don't change your color too much.
-        You only know the color of your neighbors and you need to choose your next color based on 
-        the color of your neighbors and your itself. Always choose your next_state as hex color in
-        a sequence (e.g. [\"00ff00\"])."
+    let rule_text = "You're a cell in a cellular automaton with a game of life like behavior.
+        Your task is to respond with your next state based on the state of your neighbors.
+        Your possible states are [\"#ffffff\", \"#000000\"] (dead, alive).
+        Your rules are as follows:
+        - If you're alive and have less than 2 alive neighbors, you die.
+        - If you're alive and have more than 3 alive neighbors, you die.
+        - If you're dead and have exactly 3 alive neighbors, you become alive.
+        Always choose your next_state as hex color in a sequence (e.g. [\"ffffff\"])."
         .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone());
 
-    let initial_states = ["#ff0000", "#00ff00", "#0000ff"]
-        .map(|d| d.to_string())
-        .to_vec();
+    let initial_states = ["#ffffff", "#000000"].map(|d| d.to_string()).to_vec();
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
