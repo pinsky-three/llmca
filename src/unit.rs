@@ -1,5 +1,3 @@
-use std::{env, time::Duration};
-
 use reqwest::{header, Client};
 
 use serde_derive::{Deserialize, Serialize};
@@ -27,25 +25,24 @@ struct CognitiveUnitOutput {
 }
 
 pub struct CognitiveContext {
-    client: Box<Client>,
+    pub client: Box<Client>,
+    pub base_api: String,
+    pub model_name: String,
+    pub secret_key: String,
 }
 
 impl CognitiveUnit {
-    pub async fn calculate_next_state_with_context(
+    pub async fn calculate_next_state(
         &self,
         ctx: &CognitiveContext,
         neighbors: Vec<(String, Vec<String>)>,
     ) -> Vec<String> {
-        self.llm_model_call(Some(ctx), neighbors).await
-    }
-
-    pub async fn calculate_next_state(&self, neighbors: Vec<(String, Vec<String>)>) -> Vec<String> {
-        self.llm_model_call(None, neighbors).await
+        self.llm_model_call(ctx, neighbors).await
     }
 
     pub async fn llm_model_call(
         &self,
-        ctx: Option<&CognitiveContext>,
+        ctx: &CognitiveContext,
         neighbors: Vec<(String, Vec<String>)>,
     ) -> Vec<String> {
         let system_message = "
@@ -120,64 +117,74 @@ impl CognitiveUnit {
     }
 
     async fn generic_chat_completion(
-        ctx: Option<&CognitiveContext>,
+        ctx: &CognitiveContext,
         system_message: String,
         user_message: String,
     ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
-        let open_ai_key = env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string());
-        let model_name = env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string());
-        let api_url = env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string());
+        // let base_api = ctx.map(|c| c.base_api.clone()).unwrap_or_else(|| {
+        //     env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string())
+        // });
+
+        // let model_name = ctx
+        //     .map(|c| c.model_name.clone())
+        //     .unwrap_or_else(|| env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string()));
+
+        // let secret_key = ctx
+        //     .map(|c| c.secret_key.clone())
+        //     .unwrap_or_else(|| env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string()));
 
         let mut headers = header::HeaderMap::new();
 
         headers.insert("Content-Type", "application/json".parse().unwrap());
         headers.insert(
             "Authorization",
-            format!("Bearer {}", open_ai_key).parse().unwrap(),
+            format!("Bearer {}", ctx.secret_key).parse().unwrap(),
         );
 
         let body = json!({
-            "model": model_name,
+            "model": ctx.model_name,
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message}
             ]
         });
 
-        match ctx {
-            Some(context) => {
-                let res = context
-                    .client
-                    .post(format!("{api_url}/chat/completions"))
-                    .headers(headers)
-                    .body(body.to_string())
-                    .send()
-                    .await
-                    .unwrap();
+        // match ctx {
+        //     Some(context) => {
 
-                let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
+        //     }
+        //     None => {
+        //         let client = reqwest::blocking::Client::builder()
+        //             .timeout(Duration::from_secs(120))
+        //             .redirect(reqwest::redirect::Policy::none())
+        //             .build()
+        //             .unwrap();
 
-                Ok(parsed_res)
-            }
-            None => {
-                let client = reqwest::blocking::Client::builder()
-                    .timeout(Duration::from_secs(120))
-                    .redirect(reqwest::redirect::Policy::none())
-                    .build()
-                    .unwrap();
+        //         let res = client
+        //             // .post("https://openrouter.ai/api/v1/chat/completions")
+        //             .post(format!("{api_url}/chat/completions"))
+        //             .headers(headers)
+        //             .body(body.to_string())
+        //             .send()
+        //             .unwrap();
 
-                let res = client
-                    // .post("https://openrouter.ai/api/v1/chat/completions")
-                    .post(format!("{api_url}/chat/completions"))
-                    .headers(headers)
-                    .body(body.to_string())
-                    .send()
-                    .unwrap();
+        //         let parsed_res = res.json::<ChatCompletionResponse>().unwrap();
 
-                let parsed_res = res.json::<ChatCompletionResponse>().unwrap();
+        //         Ok(parsed_res)
+        //     }
+        // }
 
-                Ok(parsed_res)
-            }
-        }
+        let res = ctx
+            .client
+            .post(format!("{}/chat/completions", ctx.base_api))
+            .headers(headers)
+            .body(body.to_string())
+            .send()
+            .await
+            .unwrap();
+
+        let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
+
+        Ok(parsed_res)
     }
 }

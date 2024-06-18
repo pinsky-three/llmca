@@ -1,10 +1,12 @@
+// use futures::{stream, StreamExt};
 use itertools::Itertools;
-use kdam::tqdm;
+use kdam::{tqdm, BarExt};
 use petgraph::{stable_graph::StableGraph, Undirected};
 use rand::{seq::SliceRandom, thread_rng};
+use reqwest::Client;
 
-use crate::unit::CognitiveUnit;
-use std::fmt::Debug;
+use crate::unit::{CognitiveContext, CognitiveUnit};
+use std::{env, fmt::Debug};
 
 #[derive(Debug, Clone)]
 pub struct CognitiveSpace<R>
@@ -141,34 +143,108 @@ impl<R> CognitiveSpace<R>
 where
     R: CognitiveRule + Debug + Clone,
 {
-    pub async fn sync_step(&mut self) {
+    // pub async fn sync_step(&mut self) {
+    //     let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
+
+    //     for i in tqdm!(0..nodes.len()) {
+    //         let node = nodes[i];
+    //         let neighbors = self
+    //             .graph
+    //             .neighbors(node)
+    //             .map(|neighbor| {
+    //                 let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
+
+    //                 (
+    //                     format!("n_{}", neighbor.index()),
+    //                     neighbor_unit.state.clone(),
+    //                 )
+    //             })
+    //             .collect();
+
+    //         let unit = self.graph.node_weight_mut(node).unwrap();
+    //         let next_state = unit.calculate_next_state(neighbors).await;
+
+    //         // println!("next_state: {:?}", next_state);
+
+    //         unit.state = next_state;
+    //     }
+    //     // .for_each(|node| {
+
+    //     // });
+    // }
+
+    pub async fn distributed_step(&mut self) {
         let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
-        for i in tqdm!(0..nodes.len()) {
-            let node = nodes[i];
-            let neighbors = self
-                .graph
-                .neighbors(node)
-                .map(|neighbor| {
-                    let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
+        let base_api_urls =
+            env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string());
+        let models = env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string());
+        let secret_keys = env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string());
 
-                    (
-                        format!("n_{}", neighbor.index()),
-                        neighbor_unit.state.clone(),
-                    )
-                })
-                .collect();
+        let base_api_urls = base_api_urls
+            .split(',')
+            .map(|s| s.trim())
+            .collect::<Vec<_>>();
+        let models = models.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+        let secret_keys = secret_keys.split(',').map(|s| s.trim()).collect::<Vec<_>>();
 
-            let unit = self.graph.node_weight_mut(node).unwrap();
-            let next_state = unit.calculate_next_state(neighbors).await;
-
-            // println!("next_state: {:?}", next_state);
-
-            unit.state = next_state;
+        if base_api_urls.len() != models.len() || models.len() != secret_keys.len() {
+            panic!("The number of base_api_urls, models, and secret_keys must be the same.");
         }
-        // .for_each(|node| {
 
-        // });
+        let computation_units = (0..base_api_urls.len())
+            .map(|i| {
+                let base_api = base_api_urls[i];
+                let model_name = models[i];
+                let secret_key = secret_keys[i];
+
+                (base_api, model_name, secret_key)
+            })
+            .collect::<Vec<_>>();
+
+        let mut pb: kdam::Bar = tqdm!(total = nodes.len());
+
+        for chunk in nodes.chunks(computation_units.len()) {
+            let mut futures = vec![];
+
+            for (i, &node) in chunk.iter().enumerate() {
+                let neighbors = self
+                    .graph
+                    .neighbors(node)
+                    .map(|neighbor| {
+                        let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
+
+                        (
+                            format!("n_{}", neighbor.index()),
+                            neighbor_unit.state.clone(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                let unit = self.graph.node_weight_mut(node).unwrap().clone();
+                let ctx = CognitiveContext {
+                    client: Box::new(Client::new()),
+                    base_api: computation_units[i].0.to_string(),
+                    model_name: computation_units[i].1.to_string(),
+                    secret_key: computation_units[i].2.to_string(),
+                };
+
+                futures.push(tokio::spawn(async move {
+                    unit.calculate_next_state(&ctx, neighbors).await
+                }));
+            }
+
+            let next_states = futures::future::join_all(futures).await;
+
+            for (i, next_state) in next_states.into_iter().enumerate() {
+                let node = chunk[i];
+                let unit = self.graph.node_weight_mut(node).unwrap();
+
+                unit.state = next_state.unwrap();
+
+                pb.update(1).ok();
+            }
+        }
     }
 
     pub fn print_nodes_state(&self) {
