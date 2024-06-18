@@ -6,10 +6,10 @@ for subdir in "$main_dir"/*; do
     for dir in "$subdir"/*; do
         folder_name=$(basename "$dir")
         
-        echo "Revisando la carpeta: $folder_name"
+        # echo "Revisando la carpeta: $folder_name"
         
-        echo "Archivos en $dir:"
-        ls -lv "$dir"
+        # echo "Archivos en $dir:"
+        # ls -lv "$dir"
         
         if compgen -G "$dir/*.png" > /dev/null; then
             filelist="$dir/ffmpeg_filelist.txt"
@@ -30,7 +30,7 @@ for subdir in "$main_dir"/*; do
                 echo "Error al crear el video para la carpeta: $folder_name"
             fi
         else
-            echo "No se encontraron archivos PNG en la carpeta: $folder_name"
+            echo "No se encontraron archivos PNG en la carpeta: $folder_name" > /dev/null
         fi
     done
 done

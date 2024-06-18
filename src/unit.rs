@@ -1,6 +1,6 @@
 use std::{env, time::Duration};
 
-use reqwest::header;
+use reqwest::{header, Client};
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
@@ -26,12 +26,28 @@ struct CognitiveUnitOutput {
     next_state: Vec<String>,
 }
 
+pub struct CognitiveContext {
+    client: Box<Client>,
+}
+
 impl CognitiveUnit {
-    pub fn calculate_next_state(&self, neighbors: Vec<(String, Vec<String>)>) -> Vec<String> {
-        self.llm_model_call(neighbors)
+    pub async fn calculate_next_state_with_context(
+        &self,
+        ctx: &CognitiveContext,
+        neighbors: Vec<(String, Vec<String>)>,
+    ) -> Vec<String> {
+        self.llm_model_call(Some(ctx), neighbors).await
     }
 
-    pub fn llm_model_call(&self, neighbors: Vec<(String, Vec<String>)>) -> Vec<String> {
+    pub async fn calculate_next_state(&self, neighbors: Vec<(String, Vec<String>)>) -> Vec<String> {
+        self.llm_model_call(None, neighbors).await
+    }
+
+    pub async fn llm_model_call(
+        &self,
+        ctx: Option<&CognitiveContext>,
+        neighbors: Vec<(String, Vec<String>)>,
+    ) -> Vec<String> {
         let system_message = "
         You're a LLM Cognitive Unit and your unique task is to respond with your next 
         state based on the state of your neighbors in json format based on:
@@ -84,7 +100,7 @@ impl CognitiveUnit {
         })
         .unwrap();
 
-        let res = Self::generic_chat_completion(system_message, input_payload);
+        let res = Self::generic_chat_completion(ctx, system_message, input_payload).await;
 
         serde_json::from_str::<CognitiveUnitOutput>(
             &res.unwrap()
@@ -103,7 +119,8 @@ impl CognitiveUnit {
         })
     }
 
-    fn generic_chat_completion(
+    async fn generic_chat_completion(
+        ctx: Option<&CognitiveContext>,
         system_message: String,
         user_message: String,
     ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
@@ -119,12 +136,6 @@ impl CognitiveUnit {
             format!("Bearer {}", open_ai_key).parse().unwrap(),
         );
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(120))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .unwrap();
-
         let body = json!({
             "model": model_name,
             "messages": [
@@ -133,16 +144,40 @@ impl CognitiveUnit {
             ]
         });
 
-        let res = client
-            // .post("https://openrouter.ai/api/v1/chat/completions")
-            .post(format!("{api_url}/chat/completions"))
-            .headers(headers)
-            .body(body.to_string())
-            .send()
-            .unwrap();
+        match ctx {
+            Some(context) => {
+                let res = context
+                    .client
+                    .post(format!("{api_url}/chat/completions"))
+                    .headers(headers)
+                    .body(body.to_string())
+                    .send()
+                    .await
+                    .unwrap();
 
-        let parsed_res = res.json::<ChatCompletionResponse>().unwrap();
+                let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
 
-        Ok(parsed_res)
+                Ok(parsed_res)
+            }
+            None => {
+                let client = reqwest::blocking::Client::builder()
+                    .timeout(Duration::from_secs(120))
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build()
+                    .unwrap();
+
+                let res = client
+                    // .post("https://openrouter.ai/api/v1/chat/completions")
+                    .post(format!("{api_url}/chat/completions"))
+                    .headers(headers)
+                    .body(body.to_string())
+                    .send()
+                    .unwrap();
+
+                let parsed_res = res.json::<ChatCompletionResponse>().unwrap();
+
+                Ok(parsed_res)
+            }
+        }
     }
 }

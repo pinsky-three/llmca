@@ -109,7 +109,7 @@ async fn main() {
 
         next_frame().await;
 
-        space.sync_step();
+        space.sync_step().await;
 
         step += 1;
     }

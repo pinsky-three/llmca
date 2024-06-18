@@ -141,7 +141,7 @@ impl<R> CognitiveSpace<R>
 where
     R: CognitiveRule + Debug + Clone,
 {
-    pub fn sync_step(&mut self) {
+    pub async fn sync_step(&mut self) {
         let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
         for i in tqdm!(0..nodes.len()) {
@@ -160,7 +160,7 @@ where
                 .collect();
 
             let unit = self.graph.node_weight_mut(node).unwrap();
-            let next_state = unit.calculate_next_state(neighbors);
+            let next_state = unit.calculate_next_state(neighbors).await;
 
             // println!("next_state: {:?}", next_state);
 
