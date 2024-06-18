@@ -1,3 +1,4 @@
 /target
 .env
 saves
+.DS_Store

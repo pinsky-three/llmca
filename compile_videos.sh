@@ -21,9 +21,8 @@ for subdir in "$main_dir"/*; do
                 echo "file '$f'" >> "$filelist"
             done
             
-            
             output_file="$subdir"_"$folder_name.mp4"
-            ffmpeg -y -f concat -safe 0 -i "$filelist" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -pix_fmt yuv420p "$output_file"
+            ffmpeg -y -r 6 -f concat -safe 0 -i "$filelist" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -pix_fmt yuv420p "$output_file"
             
             if [ $? -eq 0 ]; then
                 echo "Video creado para la carpeta: $folder_name"
