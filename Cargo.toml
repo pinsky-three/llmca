@@ -8,6 +8,7 @@ dotenv = "0.15.0"
 eframe = "0.27.2"
 egui = "0.27.2"
 egui_graphs = "0.20.0"
+futures = "0.3.30"
 image = "0.25.1"
 itertools = "0.13.0"
 kdam = "0.5.2"
@@ -19,3 +20,4 @@ reqwest = { version = "0.12.5", features = ["blocking", "json"] }
 serde = "1.0.203"
 serde_derive = "1.0.203"
 serde_json = "1.0.117"
+tokio = { version = "1.38.0", features = ["full"] }

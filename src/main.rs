@@ -1,11 +1,13 @@
 use std::{path::PathBuf, time};
 
 use dotenv::dotenv;
+
 use itertools::Itertools;
 
 use llmca::system::{MessageModelRule, VonNeumannLatticeCognitiveSpace};
 
 use macroquad::prelude::*;
+use tokio::runtime::Runtime;
 
 fn window_conf() -> Conf {
     Conf {
@@ -20,17 +22,14 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (5, 5);
+    let (n, m) = (10, 10);
 
-    let rule_text = "You're a cell in a cellular automaton with a game of life like behavior.
+    let rule_text =
+        "You're a cell in a chessboard. Choose your color state to create a correct pattern
         Your task is to respond with your next state based on the state of your neighbors.
-        Your possible states are [\"#ffffff\", \"#000000\"] (dead, alive).
-        Your rules are as follows:
-        - If you're alive and have less than 2 alive neighbors, you die.
-        - If you're alive and have more than 3 alive neighbors, you die.
-        - If you're dead and have exactly 3 alive neighbors, you become alive.
+        Your only possible states are [\"#ffffff\", \"#000000\"].
         Always choose your next_state as hex color in a sequence (e.g. [\"ffffff\"])."
-        .to_string();
+            .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone());
 
@@ -53,6 +52,8 @@ async fn main() {
         .join(format!("{}", timestamp));
 
     std::fs::create_dir_all(folder_name.clone()).unwrap();
+
+    let rt = Runtime::new().unwrap();
 
     loop {
         println!("\nstep: {}", step);
@@ -109,19 +110,13 @@ async fn main() {
 
         next_frame().await;
 
-        space.sync_step().await;
+        rt.block_on(async {
+            space.distributed_step().await;
+        });
 
         step += 1;
     }
 }
-
-// fn get_color_by_index(index: usize) -> Color {
-//     [
-//         LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN,
-//         SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK,
-//         BLANK, MAGENTA,
-//     ][index % 25]
-// }
 
 fn get_color_from_hex_string(hex: &str) -> Color {
     let hex = hex.trim_matches(&['#', '"', '[', ']']).to_lowercase();
