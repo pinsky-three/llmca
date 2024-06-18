@@ -22,18 +22,18 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (10, 10);
+    let (n, m) = (20, 20);
 
     let rule_text =
-        "You're a cell in a chessboard. Choose your color state to create a correct pattern
-        Your task is to respond with your next state based on the state of your neighbors.
-        Your only possible states are [\"#ffffff\", \"#000000\"].
-        Always choose your next_state as hex color in a sequence (e.g. [\"ffffff\"])."
+        "You're a pixel in a image. Choose your next color based on the color of your neighbors
+        in order to create a reddish pattern with some green shades.
+        Always try to stabilize the pattern and reduce the changes of your state.
+        Always choose your next_state as hex color in a sequence (e.g. [\"#ffffff\"])."
             .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone());
 
-    let initial_states = ["#ffffff", "#000000"].map(|d| d.to_string()).to_vec();
+    let initial_states = ["#ffffff"].map(|d| d.to_string()).to_vec();
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
