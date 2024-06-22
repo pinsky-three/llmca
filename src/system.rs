@@ -26,11 +26,25 @@ pub trait CognitiveRule {
 #[derive(Debug, Clone)]
 pub struct MessageModelRule {
     prompt: String,
+    features: Vec<String>,
 }
 
 impl MessageModelRule {
-    pub fn new(prompt: String) -> Self {
-        Self { prompt }
+    pub fn new(prompt: String, features: Vec<String>) -> Self {
+        Self { prompt, features }
+    }
+
+    pub fn with_feature(&self, feature: String) -> Vec<String> {
+        self.features.clone()
+    }
+}
+
+impl Default for MessageModelRule {
+    fn default() -> Self {
+        Self {
+            prompt: "You're a LLM Cognitive Unit and your unique task is to respond with your next state based on the state of your neighbors in json format based on:".to_string(),
+            features: vec!["rule".to_string(), "state".to_string(), "neighbors".to_string()],
+        }
     }
 }
 
