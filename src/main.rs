@@ -22,14 +22,13 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (20, 20);
+    let (n, m) = (10, 10);
 
-    let rule_text =
-        "You're a pixel in a image. Choose your next color based on the color of your neighbors
-        in order to create a reddish pattern with some green shades.
-        Always try to stabilize the pattern and reduce the changes of your state.
-        Always choose your next_state as hex color in a sequence (e.g. [\"#ffffff\"])."
-            .to_string();
+    let rule_text = "You represent a pixel in a big image.
+        This image is the result of a fluid simulation.
+        Your task is to update your color based on the colors of your neighbors.
+        This fluid simulation is redish and greenish."
+        .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone());
 
