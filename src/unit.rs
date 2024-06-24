@@ -1,4 +1,5 @@
 use reqwest::{header, Client};
+use schemars::{schema_for, JsonSchema};
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
@@ -13,7 +14,7 @@ pub struct CognitiveUnit {
     pub feedback: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 struct CognitiveUnitInput {
     rule: String,
     state: Vec<String>,
@@ -21,7 +22,7 @@ struct CognitiveUnitInput {
     feedback: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 struct CognitiveUnitOutput {
     next_state: Vec<String>,
 }
@@ -52,24 +53,30 @@ impl CognitiveUnit {
         ctx: &CognitiveContext,
         neighbors: Vec<(String, Vec<String>)>,
     ) -> LLMComputationResult {
-        let system_message = "
+        let unit_input_json_schema =
+            serde_json::to_string_pretty(&schema_for!(CognitiveUnitInput)).unwrap();
+
+        let unit_output_json_schema =
+            serde_json::to_string_pretty(&schema_for!(CognitiveUnitOutput)).unwrap();
+
+        let system_message = format!(
+            "
         You're a LLM Cognitive Unit and your unique task is to respond with your next 
         state based on the state of your neighbors in json format based on:
         
-        #[derive(Debug, Clone, Serialize)]
-        struct CognitiveUnitInput {
-            rule: String,
-            state: Vec<String>, // json sequence of states as any kind of string
-            neighbors: Vec<(String, Vec<String>)>, // json sequence of (name, state)
-        } 
 
-        #[derive(Debug, Clone, Deserialize)]
-        struct CognitiveUnitOutput {
-            next_state: Vec<String>, // json sequence of states as any kind of string
-        }
+        input_json_schema:
+        ```json
+        {unit_input_json_schema}
+        ```
+
+        output_json_schema:
+        ```json
+        {unit_output_json_schema}
+        ```
 
         example input: 
-        {
+        {{
             \"rule\": \"You're a cellular automaton with game of life behavior. 
             Response with your next state based on the state of your neighbors.
             Don't response with explanations or nothing else, only your state.
@@ -85,17 +92,19 @@ impl CognitiveUnit {
                 [\"n_6\", [\"0\"]],
                 [\"n_7\", [\"0\"]]
             ]
-        }
+        }}
 
         example output:
-        {
+        {{
             \"next_state\": [\"1\"]
-        }
+        }}
+
+        You can use the state array to store valuable information about the unit and its neighbors.
 
         Be careful with your response, it should be a valid json with the next_state field.
         Take care of trailing characters, spaces, and new lines.
         "
-        .to_string();
+        );
 
         let input_payload = serde_json::to_string_pretty(&&CognitiveUnitInput {
             rule: self.rule.clone(),
