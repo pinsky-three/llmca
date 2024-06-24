@@ -22,7 +22,7 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (5, 5);
+    let (n, m) = (10, 10);
 
     let rule_text = "You represent a pixel in a big image.
         This image is the result of a fluid simulation.
@@ -30,7 +30,7 @@ async fn main() {
         This fluid simulation is redish and greenish."
         .to_string();
 
-    let rule = MessageModelRule::new(rule_text.clone());
+    let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
     let initial_states = ["#ffffff"].map(|d| d.to_string()).to_vec();
 

@@ -34,7 +34,8 @@ impl MessageModelRule {
         Self { prompt, features }
     }
 
-    pub fn with_feature(&self, feature: String) -> Vec<String> {
+    pub fn with_feature(&mut self, feature: String) -> Vec<String> {
+        self.features.push(feature);
         self.features.clone()
     }
 }
@@ -91,6 +92,7 @@ where
                     rule,
                     state,
                     position,
+                    feedback: None,
                 };
 
                 (graph.add_node(unit.clone()), position)
@@ -157,36 +159,6 @@ impl<R> CognitiveSpace<R>
 where
     R: CognitiveRule + Debug + Clone,
 {
-    // pub async fn sync_step(&mut self) {
-    //     let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
-
-    //     for i in tqdm!(0..nodes.len()) {
-    //         let node = nodes[i];
-    //         let neighbors = self
-    //             .graph
-    //             .neighbors(node)
-    //             .map(|neighbor| {
-    //                 let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
-
-    //                 (
-    //                     format!("n_{}", neighbor.index()),
-    //                     neighbor_unit.state.clone(),
-    //                 )
-    //             })
-    //             .collect();
-
-    //         let unit = self.graph.node_weight_mut(node).unwrap();
-    //         let next_state = unit.calculate_next_state(neighbors).await;
-
-    //         // println!("next_state: {:?}", next_state);
-
-    //         unit.state = next_state;
-    //     }
-    //     // .for_each(|node| {
-
-    //     // });
-    // }
-
     pub async fn distributed_step(&mut self) {
         let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
@@ -254,7 +226,10 @@ where
                 let node = chunk[i];
                 let unit = self.graph.node_weight_mut(node).unwrap();
 
-                unit.state = next_state.unwrap();
+                let next_state = next_state.unwrap();
+
+                unit.state = next_state.calculated_state;
+                unit.feedback = next_state.feedback;
 
                 pb.update(1).ok();
             }
