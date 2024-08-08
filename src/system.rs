@@ -18,7 +18,7 @@ where
 }
 
 pub trait CognitiveRule {
-    fn get_rule_prompt(&self) -> String;
+    fn compile_prompt(&self) -> String;
     // fn get_rule_prompt(&self, Vec<String>) -> String;
     // fn get_rule_prompt(&self, fn(Vec<String>)->String) -> String;
 }
@@ -50,7 +50,7 @@ impl Default for MessageModelRule {
 }
 
 impl CognitiveRule for MessageModelRule {
-    fn get_rule_prompt(&self) -> String {
+    fn compile_prompt(&self) -> String {
         self.prompt.clone()
     }
 }
@@ -60,14 +60,14 @@ where
     R: CognitiveRule + Debug + Clone,
 {
     rule: Box<R>,
-    initial_states: Vec<String>,
+    initial_states: Vec<Vec<String>>,
 }
 
 impl<R> VonNeumannLatticeCognitiveSpace<R>
 where
     R: CognitiveRule + Debug + Clone,
 {
-    pub fn new(rule: R, initial_states: Vec<String>) -> Self {
+    pub fn new(rule: R, initial_states: Vec<Vec<String>>) -> Self {
         Self {
             rule: Box::new(rule),
             initial_states,
@@ -86,8 +86,8 @@ where
         let (nodes, positions): (Vec<_>, Vec<_>) = (0..n)
             .cartesian_product(0..m)
             .map(|position| {
-                let state = vec![self.initial_states.choose(&mut rng).unwrap().to_string()];
-                let rule = self.rule.get_rule_prompt();
+                let state = self.initial_states.choose(&mut rng).unwrap().to_owned();
+                let rule = self.rule.compile_prompt();
                 let unit = CognitiveUnit {
                     rule,
                     state,
@@ -249,5 +249,18 @@ where
 
     pub fn get_units(&self) -> Vec<CognitiveUnit> {
         self.graph.node_weights().cloned().collect()
+    }
+
+    pub fn set_unit(&mut self, i: usize, j: usize, unit: CognitiveUnit) {
+        let xy_to_index = |i: usize, j: usize| -> usize { i * j + j };
+
+        let node = self.graph.node_indices().nth(xy_to_index(i, j)).unwrap();
+
+        let internal_unit = self.graph.node_weight_mut(node).unwrap();
+
+        internal_unit.state = unit.state;
+        internal_unit.rule = unit.rule;
+        internal_unit.position = unit.position;
+        internal_unit.feedback = unit.feedback;
     }
 }

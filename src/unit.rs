@@ -14,6 +14,18 @@ pub struct CognitiveUnit {
     pub feedback: Option<String>,
 }
 
+pub struct CognitiveContext {
+    pub client: Box<Client>,
+    pub base_api: String,
+    pub model_name: String,
+    pub secret_key: String,
+}
+
+pub struct LLMComputationResult {
+    pub calculated_state: Vec<String>,
+    pub feedback: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 struct CognitiveUnitInput {
     rule: String,
@@ -25,18 +37,6 @@ struct CognitiveUnitInput {
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 struct CognitiveUnitOutput {
     next_state: Vec<String>,
-}
-
-pub struct CognitiveContext {
-    pub client: Box<Client>,
-    pub base_api: String,
-    pub model_name: String,
-    pub secret_key: String,
-}
-
-pub struct LLMComputationResult {
-    pub calculated_state: Vec<String>,
-    pub feedback: Option<String>,
 }
 
 impl CognitiveUnit {
@@ -100,6 +100,7 @@ impl CognitiveUnit {
         }}
 
         You can use the state array to store valuable information about the unit and its neighbors.
+        Each value in your state array is called a channel and can be used to store different types of information.
 
         Be careful with your response, it should be a valid json with the next_state field.
         Take care of trailing characters, spaces, and new lines.

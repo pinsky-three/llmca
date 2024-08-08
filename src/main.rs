@@ -22,17 +22,22 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (10, 10);
+    let (n, m) = (30, 30);
 
-    let rule_text = "You represent a pixel in a big image.
-        This image is the result of a fluid simulation.
-        Your task is to update your color based on the colors of your neighbors.
-        This fluid simulation is redish and greenish."
+    let rule_text = "You're a pixel in a video, you choose
+    your color based on the color of your neighbors. and always as hex string: \"#ffffff\".
+    You can also add a comment to explain your choice in your second channel.
+    Your video is a representation of the rain, choose colors that represent the rain.
+     (e.g. [\"#ffffff\", \"I select white because I'm part of a cloud\"])."
         .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
-    let initial_states = ["#ffffff"].map(|d| d.to_string()).to_vec();
+    let initial_states = [vec![
+        "#aaaaaa".to_string(),
+        "Hello There, I'm using this channel to share internal thoughts.".to_string(),
+    ]]
+    .to_vec();
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
@@ -60,7 +65,7 @@ async fn main() {
         let all_states = space
             .get_units()
             .iter()
-            .map(|u| serde_json::to_string(&u.state).unwrap())
+            .map(|u| serde_json::to_string(&u.state.first()).unwrap())
             .collect::<Vec<_>>();
 
         let unique_states = all_states.iter().collect::<std::collections::HashSet<_>>();
@@ -79,7 +84,7 @@ async fn main() {
         );
 
         space.get_units().iter().for_each(|unit| {
-            let state = &serde_json::to_string(&unit.state).unwrap();
+            let state = &serde_json::to_string(&unit.state.first()).unwrap();
 
             let (p_x, p_y) = unit.position;
 
@@ -120,13 +125,13 @@ async fn main() {
 fn get_color_from_hex_string(hex: &str) -> Color {
     let hex = hex.trim_matches(&['#', '"', '[', ']']).to_lowercase();
 
-    if hex.len() != 6 {
+    if hex.len() < 6 {
         return Color::new(0.0, 0.0, 0.0, 1.0);
     }
 
-    let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
-    let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
-    let b = u8::from_str_radix(&hex[4..6], 16).unwrap();
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
 
     Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0)
 }
