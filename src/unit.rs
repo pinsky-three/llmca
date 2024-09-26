@@ -14,6 +14,12 @@ pub struct CognitiveUnit {
     pub feedback: Option<String>,
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct CognitiveSubstrateUnit {
+    prompt: String,
+    pub max_size: u64,
+}
+
 pub struct CognitiveContext {
     pub client: Box<Client>,
     pub base_api: String,
@@ -37,6 +43,47 @@ struct CognitiveUnitInput {
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 struct CognitiveUnitOutput {
     next_state: Vec<String>,
+}
+
+impl CognitiveContext {
+    async fn generic_chat_completion(
+        &self,
+        system_message: String,
+        user_message: String,
+    ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
+        let mut headers = header::HeaderMap::new();
+
+        headers.insert("Content-Type", "application/json".parse().unwrap());
+        headers.insert(
+            "Authorization",
+            format!("Bearer {}", self.secret_key).parse().unwrap(),
+        );
+
+        let body = json!({
+            "model": self.model_name,
+            "messages": [
+                // {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ]
+        });
+
+        // println!("body: {}", body);
+
+        let res = self
+            .client
+            .post(format!("{}/chat/completions", self.base_api))
+            .headers(headers)
+            .body(body.to_string())
+            .send()
+            .await
+            .unwrap();
+
+        let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
+
+        // println!("parsed_res: {:?}", parsed_res);
+
+        Ok(parsed_res)
+    }
 }
 
 impl CognitiveUnit {
@@ -115,7 +162,9 @@ impl CognitiveUnit {
         })
         .unwrap();
 
-        let res = Self::generic_chat_completion(ctx, system_message, input_payload).await;
+        let res = ctx
+            .generic_chat_completion(system_message, input_payload)
+            .await;
 
         match serde_json::from_str::<CognitiveUnitOutput>(
             &res.unwrap()
@@ -136,39 +185,80 @@ impl CognitiveUnit {
             },
         }
     }
+}
 
-    async fn generic_chat_completion(
-        ctx: &CognitiveContext,
-        system_message: String,
-        user_message: String,
-    ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
-        let mut headers = header::HeaderMap::new();
+impl CognitiveSubstrateUnit {
+    pub fn new(prompt: String, max_size: u64) -> Self {
+        Self { prompt, max_size }
+    }
 
-        headers.insert("Content-Type", "application/json".parse().unwrap());
-        headers.insert(
-            "Authorization",
-            format!("Bearer {}", ctx.secret_key).parse().unwrap(),
+    pub fn get_prompt(&self) -> String {
+        self.prompt
+            .chars()
+            .take(self.max_size as usize)
+            .collect::<String>()
+    }
+
+    pub async fn compute(&self, ctx: &CognitiveContext) -> String {
+        // let system_message = self.prompt.clone();
+        let system_message = self.get_prompt();
+        let user_message = format!(
+            "current_prompt: {}\nmax_size: {}",
+            system_message, self.max_size
         );
 
-        let body = json!({
-            "model": ctx.model_name,
-            "messages": [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message}
-            ]
-        });
-
-        let res = ctx
-            .client
-            .post(format!("{}/chat/completions", ctx.base_api))
-            .headers(headers)
-            .body(body.to_string())
-            .send()
+        let parsed_res = ctx
+            .generic_chat_completion(system_message, user_message)
             .await
             .unwrap();
 
-        let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
+        parsed_res
+            .choices
+            .first()
+            .unwrap()
+            .message
+            .content
+            .trim()
+            .to_string()
+    }
 
-        Ok(parsed_res)
+    pub async fn cross_with(
+        &self,
+        ctx: &CognitiveContext,
+        other: &CognitiveSubstrateUnit,
+    ) -> (String, String) {
+        let system_message_1 = self.get_prompt();
+        let system_message_2 = other.get_prompt();
+
+        let system_message = format!("{}\n{}", system_message_1, system_message_2);
+
+        let user_message = format!(
+            "current_prompt: {}\nmax_size: {}",
+            system_message, self.max_size
+        );
+
+        let parsed_res = ctx
+            .generic_chat_completion(system_message, user_message)
+            .await
+            .unwrap();
+
+        // println!("parsed_res: {:?}", parsed_res);
+
+        let mut result = parsed_res
+            .choices
+            .first()
+            .unwrap()
+            .message
+            .content
+            .split('\n');
+
+        (
+            result.next().unwrap().to_string(),
+            result.next().unwrap_or("").to_string(),
+        )
+    }
+
+    pub async fn update_prompt(&mut self, new_prompt: String) {
+        self.prompt = new_prompt.chars().take(self.max_size as usize).collect();
     }
 }
