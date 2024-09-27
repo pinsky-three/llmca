@@ -30,8 +30,8 @@ async fn main() {
 
     // let (n, m) = (3, 3);
 
-    let n_individuals = 10;
-    let max_size = 64;
+    let n_individuals = 100;
+    let max_size = 256;
 
     let mut individuals: Vec<CognitiveSubstrateUnit> = (0..n_individuals)
         .map(|_i| {
@@ -45,7 +45,7 @@ async fn main() {
     let ctx = CognitiveContext {
         client: Box::new(Client::new()),
         base_api: "http://localhost:11434/v1".to_string(),
-        model_name: "gemma2:2b".to_string(),
+        model_name: "llama3.2:1b".to_string(),
         secret_key: std::env::var("OPENAI_API_KEY").unwrap(),
     };
 

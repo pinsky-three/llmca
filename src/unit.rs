@@ -48,7 +48,7 @@ struct CognitiveUnitOutput {
 impl CognitiveContext {
     async fn generic_chat_completion(
         &self,
-        system_message: String,
+        _system_message: String,
         _user_message: String,
     ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
         let mut headers = header::HeaderMap::new();
@@ -62,8 +62,8 @@ impl CognitiveContext {
         let body = json!({
             "model": self.model_name,
             "messages": [
-                {"role": "system", "content": system_message},
-                // {"role": "user", "content": _user_message}
+                // {"role": "system", "content": system_message},
+                {"role": "user", "content": _user_message}
             ]
         });
 
