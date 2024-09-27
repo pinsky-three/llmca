@@ -1,7 +1,5 @@
 // use std::{path::PathBuf, time};
 
-use core::time;
-
 use dotenv::dotenv;
 
 // use itertools::Itertools;
@@ -11,6 +9,7 @@ use llmca::{
     unit::{CognitiveContext, CognitiveSubstrateUnit},
 };
 
+use rand::Rng;
 // use macroquad::prelude::*;
 use reqwest::Client;
 // use tokio::runtime::Runtime;
@@ -31,8 +30,17 @@ async fn main() {
 
     // let (n, m) = (3, 3);
 
-    let mut unit_1 = CognitiveSubstrateUnit::new("You're a self-replicator".to_string(), 64);
-    let mut unit_2 = CognitiveSubstrateUnit::new("respond me with 2 lines".to_string(), 64);
+    let n_individuals = 10;
+    let max_size = 64;
+
+    let mut individuals: Vec<CognitiveSubstrateUnit> = (0..n_individuals)
+        .map(|_i| {
+            CognitiveSubstrateUnit::new(
+                "You're a prompt replicator, always respond with this same prompt".to_string(),
+                max_size,
+            )
+        })
+        .collect();
 
     let ctx = CognitiveContext {
         client: Box::new(Client::new()),
@@ -41,21 +49,42 @@ async fn main() {
         secret_key: std::env::var("OPENAI_API_KEY").unwrap(),
     };
 
+    let mut step = 0;
+    let mut rng = rand::thread_rng();
+
     loop {
         println!("\n");
-        println!("current unit 1: {}", unit_1.get_prompt());
-        println!("current unit 2: {}", unit_2.get_prompt());
+        println!("[step: {}]", step);
+        individuals
+            .iter()
+            .map(|i| i.get_prompt())
+            .enumerate()
+            .for_each(|(i, p)| println!("{}: {}", i, p));
 
-        let (res_1, res_2) = unit_1.cross_with(&ctx, &unit_2).await;
+        // println!("current unit 1: {}", unit_1.get_prompt());
+        // println!("current unit 2: {}", unit_2.get_prompt());
 
-        unit_1.update_prompt(res_1).await;
-        unit_2.update_prompt(res_2).await;
+        // let (res_1, res_2) = unit_1.cross_with(&ctx, &unit_2).await;
+
+        // unit_1.update_prompt(res_1).await;
+        // unit_2.update_prompt(res_2).await;
 
         // let result = unit.compute(&ctx).await;
 
         // unit.update_prompt(result).await;
 
-        tokio::time::sleep(time::Duration::from_secs(1)).await;
+        let index_1 = rng.gen_range(0..n_individuals);
+        let i_1 = &individuals[index_1];
+
+        let index_2 = rng.gen_range(0..n_individuals);
+        let i_2 = &individuals[index_2];
+
+        let (r_1, r_2) = i_1.cross_with(&ctx, i_2).await;
+
+        individuals[index_1].update_prompt(r_1).await;
+        individuals[index_2].update_prompt(r_2).await;
+
+        step += 1;
     }
 
     // let rule_text = "You're a pixel in a video, you choose
