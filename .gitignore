@@ -2,3 +2,4 @@
 .env
 saves
 .DS_Store
+.vscode
