@@ -24,20 +24,13 @@ async fn main() {
 
     let (n, m) = (30, 30);
 
-    let rule_text = "You're a pixel in a video, you choose
-    your color based on the color of your neighbors. and always as hex string: \"#ffffff\".
-    You can also add a comment to explain your choice in your second channel.
-    Your video is a representation of the rain, choose colors that represent the rain.
-     (e.g. [\"#ffffff\", \"I select white because I'm part of a cloud\"])."
+    let rule_text = "You're a pixel in a hue color gradient, choose your color 
+    based on the color of your neighbors. always response with hex string like: \"#RRGGBB\"."
         .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
-    let initial_states = [vec![
-        "#aaaaaa".to_string(),
-        "Hello There, I'm using this channel to share internal thoughts.".to_string(),
-    ]]
-    .to_vec();
+    let initial_states = [vec!["#aaaaaa".to_string()]].to_vec();
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 

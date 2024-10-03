@@ -188,6 +188,8 @@ where
             })
             .collect::<Vec<_>>();
 
+        println!("computation_units: {:?}", computation_units);
+
         let mut pb: kdam::Bar = tqdm!(total = nodes.len());
 
         for chunk in nodes.chunks(computation_units.len()) {
