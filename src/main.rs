@@ -22,11 +22,9 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (30, 30);
+    let (n, m) = (10, 10);
 
-    let rule_text = "You're a pixel in a hue color gradient, choose your color 
-    based on the color of your neighbors. always response with hex string like: \"#RRGGBB\"."
-        .to_string();
+    let rule_text = "always response with hex string like: \"#RRGGBB\"".to_string();
 
     let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
