@@ -24,7 +24,11 @@ async fn main() {
 
     let (n, m) = (10, 10);
 
-    let rule_text = "always response with hex string like: \"#RRGGBB\"".to_string();
+    let rule_text = "You represent a pixel in a big image.
+        This image is the result of a fluid simulation.
+        Your task is to update your color based on the colors of your neighbors.
+        This fluid simulation is redish and greenish."
+        .to_string();
 
     let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
