@@ -30,9 +30,9 @@ async fn main() {
         This fluid simulation is redish and greenish."
         .to_string();
 
-    let rule = MessageModelRule::new(rule_text.clone());
+    let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
-    let initial_states = ["#ffffff"].map(|d| d.to_string()).to_vec();
+    let initial_states = [vec!["#aaaaaa".to_string()]].to_vec();
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
@@ -60,7 +60,7 @@ async fn main() {
         let all_states = space
             .get_units()
             .iter()
-            .map(|u| serde_json::to_string(&u.state).unwrap())
+            .map(|u| serde_json::to_string(&u.state.first()).unwrap())
             .collect::<Vec<_>>();
 
         let unique_states = all_states.iter().collect::<std::collections::HashSet<_>>();
@@ -79,7 +79,7 @@ async fn main() {
         );
 
         space.get_units().iter().for_each(|unit| {
-            let state = &serde_json::to_string(&unit.state).unwrap();
+            let state = &serde_json::to_string(&unit.state.first()).unwrap();
 
             let (p_x, p_y) = unit.position;
 
@@ -120,13 +120,13 @@ async fn main() {
 fn get_color_from_hex_string(hex: &str) -> Color {
     let hex = hex.trim_matches(&['#', '"', '[', ']']).to_lowercase();
 
-    if hex.len() != 6 {
+    if hex.len() < 6 {
         return Color::new(0.0, 0.0, 0.0, 1.0);
     }
 
-    let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
-    let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
-    let b = u8::from_str_radix(&hex[4..6], 16).unwrap();
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
 
     Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0)
 }

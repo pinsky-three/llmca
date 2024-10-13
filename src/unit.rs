@@ -1,4 +1,5 @@
 use reqwest::{header, Client};
+use schemars::{schema_for, JsonSchema};
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
@@ -10,18 +11,7 @@ pub struct CognitiveUnit {
     pub rule: String,
     pub state: Vec<String>,
     pub position: (usize, usize),
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct CognitiveUnitInput {
-    rule: String,
-    state: Vec<String>,
-    neighbors: Vec<(String, Vec<String>)>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct CognitiveUnitOutput {
-    next_state: Vec<String>,
+    pub feedback: Option<String>,
 }
 
 pub struct CognitiveContext {
@@ -31,12 +21,30 @@ pub struct CognitiveContext {
     pub secret_key: String,
 }
 
+pub struct LLMComputationResult {
+    pub calculated_state: Vec<String>,
+    pub feedback: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+struct CognitiveUnitInput {
+    rule: String,
+    state: Vec<String>,
+    neighbors: Vec<(String, Vec<String>)>,
+    feedback: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+struct CognitiveUnitOutput {
+    next_state: Vec<String>,
+}
+
 impl CognitiveUnit {
     pub async fn calculate_next_state(
         &self,
         ctx: &CognitiveContext,
         neighbors: Vec<(String, Vec<String>)>,
-    ) -> Vec<String> {
+    ) -> LLMComputationResult {
         self.llm_model_call(ctx, neighbors).await
     }
 
@@ -44,25 +52,31 @@ impl CognitiveUnit {
         &self,
         ctx: &CognitiveContext,
         neighbors: Vec<(String, Vec<String>)>,
-    ) -> Vec<String> {
-        let system_message = "
+    ) -> LLMComputationResult {
+        let unit_input_json_schema =
+            serde_json::to_string_pretty(&schema_for!(CognitiveUnitInput)).unwrap();
+
+        let unit_output_json_schema =
+            serde_json::to_string_pretty(&schema_for!(CognitiveUnitOutput)).unwrap();
+
+        let system_message = format!(
+            "
         You're a LLM Cognitive Unit and your unique task is to respond with your next 
         state based on the state of your neighbors in json format based on:
         
-        #[derive(Debug, Clone, Serialize)]
-        struct CognitiveUnitInput {
-            rule: String,
-            state: Vec<String>, // json sequence of states as any kind of string
-            neighbors: Vec<(String, Vec<String>)>, // json sequence of (name, state)
-        } 
 
-        #[derive(Debug, Clone, Deserialize)]
-        struct CognitiveUnitOutput {
-            next_state: Vec<String>, // json sequence of states as any kind of string
-        }
+        input_json_schema:
+        ```json
+        {unit_input_json_schema}
+        ```
 
-        example input:
-        {
+        output_json_schema:
+        ```json
+        {unit_output_json_schema}
+        ```
+
+        example input: 
+        {{
             \"rule\": \"You're a cellular automaton with game of life behavior. 
             Response with your next state based on the state of your neighbors.
             Don't response with explanations or nothing else, only your state.
@@ -78,28 +92,32 @@ impl CognitiveUnit {
                 [\"n_6\", [\"0\"]],
                 [\"n_7\", [\"0\"]]
             ]
-        }
+        }}
 
         example output:
-        {
+        {{
             \"next_state\": [\"1\"]
-        }
+        }}
+
+        You can use the state array to store valuable information about the unit and its neighbors.
+        Each value in your state array is called a channel and can be used to store different types of information.
 
         Be careful with your response, it should be a valid json with the next_state field.
         Take care of trailing characters, spaces, and new lines.
         "
-        .to_string();
+        );
 
-        let input_payload = serde_json::to_string_pretty(&CognitiveUnitInput {
+        let input_payload = serde_json::to_string_pretty(&&CognitiveUnitInput {
             rule: self.rule.clone(),
             state: self.state.clone(),
+            feedback: self.feedback.clone(),
             neighbors,
         })
         .unwrap();
 
         let res = Self::generic_chat_completion(ctx, system_message, input_payload).await;
 
-        serde_json::from_str::<CognitiveUnitOutput>(
+        match serde_json::from_str::<CognitiveUnitOutput>(
             &res.unwrap()
                 .choices
                 .first()
@@ -107,13 +125,16 @@ impl CognitiveUnit {
                 .clone()
                 .message
                 .content,
-        )
-        .map(|o| o.next_state)
-        .unwrap_or_else(|err| {
-            println!("Error in LLM model call ({:?}): {:?}", self.position, err);
-
-            self.state.clone()
-        })
+        ) {
+            Ok(output) => LLMComputationResult {
+                calculated_state: output.next_state,
+                feedback: None,
+            },
+            Err(err) => LLMComputationResult {
+                calculated_state: self.state.clone(),
+                feedback: Some(format!("Error from Learning Machine: {:?}", err)),
+            },
+        }
     }
 
     async fn generic_chat_completion(
@@ -121,18 +142,6 @@ impl CognitiveUnit {
         system_message: String,
         user_message: String,
     ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
-        // let base_api = ctx.map(|c| c.base_api.clone()).unwrap_or_else(|| {
-        //     env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string())
-        // });
-
-        // let model_name = ctx
-        //     .map(|c| c.model_name.clone())
-        //     .unwrap_or_else(|| env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string()));
-
-        // let secret_key = ctx
-        //     .map(|c| c.secret_key.clone())
-        //     .unwrap_or_else(|| env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string()));
-
         let mut headers = header::HeaderMap::new();
 
         headers.insert("Content-Type", "application/json".parse().unwrap());
@@ -148,31 +157,6 @@ impl CognitiveUnit {
                 {"role": "user", "content": user_message}
             ]
         });
-
-        // match ctx {
-        //     Some(context) => {
-
-        //     }
-        //     None => {
-        //         let client = reqwest::blocking::Client::builder()
-        //             .timeout(Duration::from_secs(120))
-        //             .redirect(reqwest::redirect::Policy::none())
-        //             .build()
-        //             .unwrap();
-
-        //         let res = client
-        //             // .post("https://openrouter.ai/api/v1/chat/completions")
-        //             .post(format!("{api_url}/chat/completions"))
-        //             .headers(headers)
-        //             .body(body.to_string())
-        //             .send()
-        //             .unwrap();
-
-        //         let parsed_res = res.json::<ChatCompletionResponse>().unwrap();
-
-        //         Ok(parsed_res)
-        //     }
-        // }
 
         let res = ctx
             .client

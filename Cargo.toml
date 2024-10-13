@@ -5,19 +5,20 @@ edition = "2021"
 
 [dependencies]
 dotenv = "0.15.0"
-eframe = "0.27.2"
-egui = "0.27.2"
-egui_graphs = "0.20.0"
-futures = "0.3.30"
-image = "0.25.1"
+eframe = "0.29.1"
+egui = "0.29.1"
+egui_graphs = "0.22.0"
+futures = "0.3.31"
+image = "0.25.2"
 itertools = "0.13.0"
 kdam = "0.5.2"
-macroquad = "0.4.8"
+macroquad = "0.4.13"
 md5 = "0.7.0"
 petgraph = "0.6.5"
 rand = "0.8.5"
-reqwest = { version = "0.12.5", features = ["blocking", "json"] }
-serde = "1.0.203"
-serde_derive = "1.0.203"
-serde_json = "1.0.117"
-tokio = { version = "1.38.0", features = ["full"] }
+reqwest = { version = "0.12.8", features = ["blocking", "json"] }
+schemars = "0.8.21"
+serde = "1.0.210"
+serde_derive = "1.0.210"
+serde_json = "1.0.128"
+tokio = { version = "1.40.0", features = ["full"] }
