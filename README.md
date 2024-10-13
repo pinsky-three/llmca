@@ -1,5 +1,22 @@
 
-# LLMCA: Language Model Cellular Automata
+# LLMCA: Large Language Model Cellular Automata
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+    <video controls src="saves/21f3eaccfb3841a35c2a60a597f06d50_1727826848.mp4" title="Title"></video>
+    <video controls src="saves/b0f16e50d0c469441c2e2e09ceab8bb4_1720554721.mp4" title="Title"></video>
+    <video controls src="saves/3f43596b26cc29274c67b271c7a840ef_1719038138.mp4" title="Title"></video>
+    <video controls src="saves/31f4debe9c9e2233dd6bd803614f5233_1728006302.mp4" title="Title"></video>
+    <video controls src="saves/4c42aeae66cac878b21b83a217a4928c_1719265698.mp4" title="Title"></video>
+    <video controls src="saves/21f3eaccfb3841a35c2a60a597f06d50_1727706668.mp4" title="Title"></video>
+    <video controls src="saves/b0d01a0d24c35780b62805c63e5fb573_1718658527.mp4" title="Title"></video>
+    <video controls src="saves/b0f16e50d0c469441c2e2e09ceab8bb4_1727470870.mp4" title="Title"></video>
+    <video controls src="saves/21f3eaccfb3841a35c2a60a597f06d50_1727641836.mp4" title="Title"></video>
+</div>
+
+
+<!-- <video controls src="saves/21f3eaccfb3841a35c2a60a597f06d50_1727826848.mp4" title="Title"></video> <video controls src="saves/b0f16e50d0c469441c2e2e09ceab8bb4_1720554721.mp4" title="Title"></video> <video controls src="saves/3f43596b26cc29274c67b271c7a840ef_1719038138.mp4" title="Title"></video> <video controls src="saves/31f4debe9c9e2233dd6bd803614f5233_1728006302.mp4" title="Title"></video> <video controls src="saves/4c42aeae66cac878b21b83a217a4928c_1719265698.mp4" title="Title"></video> <video controls src="saves/21f3eaccfb3841a35c2a60a597f06d50_1727706668.mp4" title="Title"></video> <video controls src="saves/b0d01a0d24c35780b62805c63e5fb573_1718658527.mp4" title="Title"></video> <video controls src="saves/b0f16e50d0c469441c2e2e09ceab8bb4_1727470870.mp4" title="Title"></video> <video controls src="saves/21f3eaccfb3841a35c2a60a597f06d50_1727641836.mp4" title="Title"></video>
+ -->
+
 
 LLMCA (Language Model Cellular Automata) is an experimental project that combines cellular automata with language models (LLM). This project allows simulating a cognitive space where each cell is a cognitive unit evolving based on rules defined by a language model.
 
