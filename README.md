@@ -1,6 +1,19 @@
 # LLMCA: Large Language Model Cellular Automata
 
 
+
+https://github.com/user-attachments/assets/921f2b91-845f-4940-aa2f-fb1f191cdd8d
+
+
+https://github.com/user-attachments/assets/d6781164-8e47-4f52-baac-b5dd0f5f02da
+    
+
+https://github.com/user-attachments/assets/43bee981-79fd-4fd4-8200-2eb465d206c6
+
+
+https://github.com/user-attachments/assets/9166ee9c-8ee9-4179-b789-4c0cf0ca0993
+
+
 ![](https://rawcdn.githack.com/pinsky-three/llmca/326953fe89a2252f5dc924f25eeb45fe66169ed2/saves/3f43596b26cc29274c67b271c7a840ef_1719215614.mp4)
 
 
