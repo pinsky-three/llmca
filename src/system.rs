@@ -8,7 +8,7 @@ use reqwest::Client;
 
 use crate::{
     unit::{CognitiveContext, CognitiveUnit},
-    unit_next::{CognitiveUnitComplex, CognitiveUnitWithMemory},
+    unit_next::{CognitiveUnitComplex, CognitiveUnitPair, CognitiveUnitWithMemory},
 };
 use std::{env, fmt::Debug};
 
@@ -171,7 +171,7 @@ where
         &self,
         n: usize,
         m: usize,
-        complex_generator: impl Fn((usize, usize)) -> CognitiveUnitComplex,
+        cognitive_unit_init_state: impl Fn((usize, usize)) -> CognitiveUnitPair,
     ) -> CognitiveSpaceWithMemory<R> {
         let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
 
@@ -193,9 +193,21 @@ where
                 //     feedback: None,
                 // };
 
-                let first_unit = complex_generator(position);
-                let unit =
-                    CognitiveUnitWithMemory::new(position, vec![(Utc::now(), first_unit)], 10);
+                let first_unit = cognitive_unit_init_state(position);
+
+                let unit = CognitiveUnitWithMemory::new(
+                    position,
+                    vec![(
+                        Utc::now(),
+                        CognitiveUnitComplex {
+                            rule: first_unit.rule.clone(),
+                            state: first_unit.state.clone(),
+                            neighbors: vec![],
+                            feedback: "".to_string(),
+                        },
+                    )],
+                    10,
+                );
 
                 (graph.add_node(unit.clone()), position)
             })
@@ -306,7 +318,7 @@ where
 
                         // (
                         // format!("n_{}", neighbor.index()),
-                        neighbor_unit.memory.last().unwrap().1.clone()
+                        neighbor_unit.memory.last().unwrap().1.to_pair()
                         // )
                     })
                     .collect::<Vec<_>>();

@@ -7,10 +7,6 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{api::ChatCompletionResponse, unit::CognitiveContext};
-// Deserialize,
-// use serde_json::json;
-
-// use crate::api::ChatCompletionResponse;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CognitiveUnitComplex {
@@ -65,15 +61,15 @@ impl CognitiveUnitWithMemory {
         memory: Vec<(DateTime<Utc>, CognitiveUnitComplex)>,
         memory_size: usize,
     ) -> Self {
-        let cognitive_unit_description = CognitiveUnitWithMemory::self_description();
+        // let cognitive_unit_description = CognitiveUnitWithMemory::self_description();
         let pair_description = CognitiveUnitPair::self_description();
 
         let system_message = [
-            "You're a LLM Cognitive Unit and your unique task is to respond with your next state based on the state of your neighbors in json format", 
-            format!("You have the following form: {}", cognitive_unit_description).as_str(),
-            format!("Return a `CognitiveUnitPair`: {}", pair_description).as_str(),
-            "If you rule is empty, you may to propose a new rule and your infer next state",
-            "The user pass to you your memory as a user input message list"
+            "You're a LLM Cognitive Unit and your unique task is to respond with your next CognitiveUnitPair based on the state of your neighbors in json format", 
+            // format!("You have the following form: {}", cognitive_unit_description).as_str(),
+            "If you rule is empty, you may to propose a new rule and your infer next CognitiveUnitPair",
+            "The user pass to you your memory as a user input message list of CognitiveUnitPair in json format",
+            format!("Always respond with a `CognitiveUnitPair`: {}", pair_description).as_str(),
         ]
         .join(". ");
 
@@ -96,36 +92,14 @@ impl CognitiveUnitWithMemory {
     pub async fn calculate_next_complex(
         &self,
         ctx: &CognitiveContext,
-        neighbors: Vec<CognitiveUnitComplex>,
+        neighbors: Vec<CognitiveUnitPair>,
     ) -> CognitiveUnitComplex {
-        // let mut next_state = CognitiveUnitComplex {
-        //     rule: "".to_string(),
-        //     state: "".to_string(),
-        //     neighbors: vec![],
-        //     feedback: "".to_string(),
-        // };
-
-        // if !self.memory.is_empty() {
-        //     let last_state = self.memory.last().unwrap().1.clone();
-        //     next_state = last_state;
-        // }
-
-        // next_state
-
-        // let input_payload = serde_json::to_string_pretty(&&CognitiveUnitInput {
-        //     rule: self.rule.clone(),
-        //     state: self.state.clone(),
-        //     feedback: self.feedback.clone(),
-        //     neighbors,
-        // })
-        // .unwrap();
-
         let input_payload = self
             .memory
             .iter()
-            .map(|m| &m.1)
-            .chain(neighbors.iter())
-            .map(|m| serde_json::to_string_pretty(m).unwrap())
+            .map(|m| m.1.to_pair())
+            .chain(neighbors.clone().into_iter())
+            .map(|m| serde_json::to_string_pretty(&m).unwrap())
             .collect::<Vec<String>>();
 
         let res =
@@ -142,12 +116,17 @@ impl CognitiveUnitWithMemory {
 
         println!("res_content: {:?}", res_content);
 
-        match serde_json::from_str::<CognitiveUnitComplex>(&res_content) {
-            Ok(output) => output,
+        match serde_json::from_str::<CognitiveUnitPair>(&res_content) {
+            Ok(output) => CognitiveUnitComplex {
+                rule: output.rule,
+                state: output.state,
+                neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
+                feedback: "".to_string(),
+            },
             Err(err) => CognitiveUnitComplex {
-                rule: "".to_string(),
-                state: "".to_string(),
-                neighbors: vec![],
+                rule: self.memory.last().unwrap().1.rule.clone(),
+                state: self.memory.last().unwrap().1.state.clone(),
+                neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
                 feedback: format!("Error: {}", err),
             },
         }

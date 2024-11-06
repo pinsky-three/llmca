@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use llmca::{
     system::{MessageModelRule, VonNeumannLatticeCognitiveSpace},
-    unit_next::CognitiveUnitComplex,
+    unit_next::CognitiveUnitPair,
 };
 
 use macroquad::prelude::*;
@@ -39,11 +39,9 @@ async fn main() {
     // let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states)
-        .build_lattice_with_memory(n, m, |_pos| CognitiveUnitComplex {
+        .build_lattice_with_memory(n, m, |_pos| CognitiveUnitPair {
             rule: rule_text.clone(),
             state: "#aaaaaa".to_string(),
-            neighbors: vec![],
-            feedback: "".to_string(),
         });
 
     let mut step = 0;
