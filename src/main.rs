@@ -25,12 +25,9 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (3, 3);
+    let (n, m) = (10, 10);
 
-    let rule_text = "You represent a pixel in a big image.
-        This image is the result of a fluid simulation.
-        Always return a valid state as color in hex (e.g. \"#rrggbb\")."
-        .to_string();
+    let rule_text = "You represent a pixel in a landscape photography.".to_string();
 
     let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
@@ -39,7 +36,7 @@ async fn main() {
     // let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
 
     let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states)
-        .build_lattice_with_memory(n, m, |_pos| CognitiveUnitPair {
+        .build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
             rule: rule_text.clone(),
             state: "#aaaaaa".to_string(),
         });

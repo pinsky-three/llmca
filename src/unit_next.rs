@@ -69,7 +69,8 @@ impl CognitiveUnitWithMemory {
             // format!("You have the following form: {}", cognitive_unit_description).as_str(),
             "If you rule is empty, you may to propose a new rule and your infer next CognitiveUnitPair",
             "The user pass to you your memory as a user input message list of CognitiveUnitPair in json format",
-            format!("Always respond with a `CognitiveUnitPair`: {}", pair_description).as_str(),
+            format!("Always respond with a plain json of `CognitiveUnitPair`: {}", pair_description).as_str(),
+            "Don't put the json in a code block, and don't add explanations, just the json ready to be parsed",
         ]
         .join(". ");
 
@@ -114,6 +115,11 @@ impl CognitiveUnitWithMemory {
             .message
             .content;
 
+        let res_content = res_content
+            .trim_matches(['`', '[', ']', '\n'])
+            .trim_start_matches("json")
+            .to_string();
+
         println!("res_content: {:?}", res_content);
 
         match serde_json::from_str::<CognitiveUnitPair>(&res_content) {
@@ -127,7 +133,7 @@ impl CognitiveUnitWithMemory {
                 rule: self.memory.last().unwrap().1.rule.clone(),
                 state: self.memory.last().unwrap().1.state.clone(),
                 neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
-                feedback: format!("Error: {}", err),
+                feedback: format!("Response Content: {}. Error: {}", res_content, err),
             },
         }
     }

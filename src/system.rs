@@ -171,6 +171,7 @@ where
         &self,
         n: usize,
         m: usize,
+        memory_size: usize,
         cognitive_unit_init_state: impl Fn((usize, usize)) -> CognitiveUnitPair,
     ) -> CognitiveSpaceWithMemory<R> {
         let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
@@ -206,7 +207,7 @@ where
                             feedback: "".to_string(),
                         },
                     )],
-                    10,
+                    memory_size,
                 );
 
                 (graph.add_node(unit.clone()), position)
