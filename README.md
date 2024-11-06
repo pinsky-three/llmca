@@ -1,7 +1,7 @@
 # LLMCA: Large Language Model Cellular Automata
 
 
-![](https://raw.githubusercontent.com/pinsky-three/llmca/main/saves/3f43596b26cc29274c67b271c7a840ef_1719215614.mp4)
+![](https://rawcdn.githack.com/pinsky-three/llmca/326953fe89a2252f5dc924f25eeb45fe66169ed2/saves/3f43596b26cc29274c67b271c7a840ef_1719215614.mp4)
 
 
 LLMCA (Language Model Cellular Automata) is an experimental project that combines cellular automata with language models (LLM). This project allows simulating a cognitive space where each cell is a cognitive unit evolving based on rules defined by a language model.
