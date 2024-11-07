@@ -27,7 +27,7 @@ async fn main() {
 
     let (n, m) = (10, 10);
 
-    let rule_text = "You represent a pixel in a landscape photography.".to_string();
+    let rule_text = "You represent a pixel in a sunset photography".to_string();
 
     let rule = MessageModelRule::new(rule_text.clone(), vec![]);
 
@@ -127,7 +127,7 @@ async fn main() {
 }
 
 fn get_color_from_hex_string(hex: &str) -> Color {
-    let hex = hex.trim_matches(['#', '"', '[', ']']).to_lowercase();
+    let hex = hex.trim_matches(['#', '\"', '[', ']']).to_lowercase();
 
     if hex.len() < 6 {
         return Color::new(0.0, 0.0, 0.0, 1.0);

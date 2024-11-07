@@ -24,7 +24,7 @@ pub struct CognitiveUnitPair {
 
 impl CognitiveUnitPair {
     pub fn self_description() -> String {
-        serde_json::to_string_pretty(&schema_for!(CognitiveUnitComplex)).unwrap()
+        serde_json::to_string_pretty(&schema_for!(CognitiveUnitPair)).unwrap()
     }
 }
 
@@ -65,12 +65,13 @@ impl CognitiveUnitWithMemory {
         let pair_description = CognitiveUnitPair::self_description();
 
         let system_message = [
-            "You're a LLM Cognitive Unit and your unique task is to respond with your next CognitiveUnitPair based on the state of your neighbors in json format", 
-            // format!("You have the following form: {}", cognitive_unit_description).as_str(),
-            "If you rule is empty, you may to propose a new rule and your infer next CognitiveUnitPair",
-            "The user pass to you your memory as a user input message list of CognitiveUnitPair in json format",
-            format!("Always respond with a plain json of `CognitiveUnitPair`: {}", pair_description).as_str(),
-            "Don't put the json in a code block, and don't add explanations, just the json ready to be parsed",
+            "You're a LLM Cognitive Unit and your unique task is to respond with your next CognitiveUnitPair based on your rule and the states of your neighbors in json format", 
+            format!("Always respond with a plain json complaint with `CognitiveUnitPair`: {}", pair_description).as_str(),
+            "The user pass to you your memory and the neighborhood states as list of 'user messages' in json format",
+            // "Don't put the json in a code block, don't add explanations, just return the json ready to be parsed based on the schema",
+            "Only if you rule is empty, you may to propose a new rule and your return it with the response",
+            "If you think the rule is wrong, you may to propose a new rule and your return it with the response",
+            "Example of valid response: {\"rule\": \"rule_1\", \"state\": \"state_1\"}",
         ]
         .join(". ");
 
@@ -95,13 +96,25 @@ impl CognitiveUnitWithMemory {
         ctx: &CognitiveContext,
         neighbors: Vec<CognitiveUnitPair>,
     ) -> CognitiveUnitComplex {
-        let input_payload = self
-            .memory
+        let input_payload = ["self memory".to_string()]
             .iter()
-            .map(|m| m.1.to_pair())
-            .chain(neighbors.clone().into_iter())
-            .map(|m| serde_json::to_string_pretty(&m).unwrap())
-            .collect::<Vec<String>>();
+            .chain(
+                self.memory
+                    .iter()
+                    .map(|m| serde_json::to_string_pretty(&m.1.to_pair()).unwrap())
+                    .collect::<Vec<String>>()
+                    .iter(),
+            )
+            .chain(["neighbors".to_string()].iter())
+            .chain(
+                neighbors
+                    .iter()
+                    .map(|n| serde_json::to_string_pretty(&n).unwrap())
+                    .collect::<Vec<String>>()
+                    .iter(),
+            )
+            .cloned()
+            .collect::<Vec<_>>();
 
         let res =
             Self::generic_chat_completion(ctx, self.system_message.clone(), input_payload).await;
