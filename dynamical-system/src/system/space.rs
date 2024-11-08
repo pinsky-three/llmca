@@ -6,9 +6,12 @@ use petgraph::{stable_graph::StableGraph, Undirected};
 use rand::{seq::SliceRandom, thread_rng};
 use reqwest::Client;
 
+use serde::Serialize;
+// use serde_derive::Serialize;
+
 use crate::{
-    unit::{CognitiveContext, CognitiveUnit},
-    unit_next::{CognitiveUnitComplex, CognitiveUnitPair, CognitiveUnitWithMemory},
+    system::unit::{CognitiveContext, CognitiveUnit},
+    system::unit_next::{CognitiveUnitComplex, CognitiveUnitPair, CognitiveUnitWithMemory},
 };
 use std::{env, fmt::Debug};
 
@@ -21,12 +24,9 @@ where
     graph: StableGraph<CognitiveUnit, (), Undirected>,
 }
 
-#[derive(Debug, Clone)]
-pub struct CognitiveSpaceWithMemory<R>
-where
-    R: CognitiveRule,
-{
-    _rule: Box<R>,
+#[derive(Debug, Clone, Serialize)]
+pub struct CognitiveSpaceWithMemory {
+    // _rule: Box<R>,
     graph: StableGraph<CognitiveUnitWithMemory, (), Undirected>,
 }
 
@@ -36,7 +36,13 @@ pub trait CognitiveRule {
     // fn get_rule_prompt(&self, fn(Vec<String>)->String) -> String;
 }
 
-#[derive(Debug, Clone)]
+impl CognitiveRule for () {
+    fn compile_prompt(&self) -> String {
+        "".to_string()
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct MessageModelRule {
     prompt: String,
     features: Vec<String>,
@@ -166,114 +172,9 @@ where
             graph,
         }
     }
-
-    pub fn build_lattice_with_memory(
-        &self,
-        n: usize,
-        m: usize,
-        memory_size: usize,
-        cognitive_unit_init_state: impl Fn((usize, usize)) -> CognitiveUnitPair,
-    ) -> CognitiveSpaceWithMemory<R> {
-        let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
-
-        // let mut rng = thread_rng();
-
-        let mut graph =
-            StableGraph::<CognitiveUnitWithMemory, (), Undirected>::with_capacity(n * m, 8 * n * m);
-
-        let (nodes, positions): (Vec<_>, Vec<_>) = (0..n)
-            .cartesian_product(0..m)
-            .map(|position| {
-                // let state = self.initial_states.choose(&mut rng).unwrap().to_owned();
-                // let rule = self.rule.compile_prompt();
-
-                // let unit = CognitiveUnitWithMemory {
-                //     rule,
-                //     state,
-                //     position,
-                //     feedback: None,
-                // };
-
-                let first_unit = cognitive_unit_init_state(position);
-
-                let unit = CognitiveUnitWithMemory::new(
-                    position,
-                    vec![(
-                        Utc::now(),
-                        CognitiveUnitComplex {
-                            rule: first_unit.rule.clone(),
-                            state: first_unit.state.clone(),
-                            neighbors: vec![],
-                            feedback: "".to_string(),
-                        },
-                    )],
-                    memory_size,
-                );
-
-                (graph.add_node(unit.clone()), position)
-            })
-            .unzip();
-
-        positions.iter().for_each(|&(i, j)| {
-            let i_s1 = i.overflowing_sub(1).1.then(|| n - 1).unwrap_or(i);
-            let j_s1 = j.overflowing_sub(1).1.then(|| m - 1).unwrap_or(j);
-
-            let i_a1 = (i + 1) % n;
-            let j_a1 = (j + 1) % m;
-
-            let n_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j)]);
-            let ne_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j_a1)]);
-            let e_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i, j_a1)]);
-            let se_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j_a1)]);
-            let s_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j)]);
-            let sw_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j_s1)]);
-            let w_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i, j_s1)]);
-            let nw_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j_s1)]);
-
-            if !graph.contains_edge(n_edge.0, n_edge.1) && n_edge.0 != n_edge.1 {
-                graph.add_edge(n_edge.0, n_edge.1, ());
-            }
-
-            if !graph.contains_edge(ne_edge.0, ne_edge.1) && ne_edge.0 != ne_edge.1 {
-                graph.add_edge(ne_edge.0, ne_edge.1, ());
-            }
-
-            if !graph.contains_edge(e_edge.0, e_edge.1) && e_edge.0 != e_edge.1 {
-                graph.add_edge(e_edge.0, e_edge.1, ());
-            }
-
-            if !graph.contains_edge(se_edge.0, se_edge.1) && se_edge.0 != se_edge.1 {
-                graph.add_edge(se_edge.0, se_edge.1, ());
-            }
-
-            if !graph.contains_edge(s_edge.0, s_edge.1) && s_edge.0 != s_edge.1 {
-                graph.add_edge(s_edge.0, s_edge.1, ());
-            }
-
-            if !graph.contains_edge(sw_edge.0, sw_edge.1) && sw_edge.0 != sw_edge.1 {
-                graph.add_edge(sw_edge.0, sw_edge.1, ());
-            }
-
-            if !graph.contains_edge(w_edge.0, w_edge.1) && w_edge.0 != w_edge.1 {
-                graph.add_edge(w_edge.0, w_edge.1, ());
-            }
-
-            if !graph.contains_edge(nw_edge.0, nw_edge.1) && nw_edge.0 != nw_edge.1 {
-                graph.add_edge(nw_edge.0, nw_edge.1, ());
-            }
-        });
-
-        CognitiveSpaceWithMemory {
-            _rule: self.rule.clone(),
-            graph,
-        }
-    }
 }
 
-impl<R> CognitiveSpaceWithMemory<R>
-where
-    R: CognitiveRule + Debug + Clone,
-{
+impl CognitiveSpaceWithMemory {
     pub async fn distributed_step(&mut self) {
         let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
@@ -381,12 +282,11 @@ where
 
         internal_unit.memory = unit.memory;
         internal_unit.memory_size = unit.memory_size;
-        internal_unit.system_message = unit.system_message;
         internal_unit.position = unit.position;
     }
 
     pub fn serialize_in_pretty_json(&self) -> String {
-        serde_json::to_string_pretty(&self.get_units()).unwrap()
+        serde_json::to_string_pretty(&self).unwrap()
     }
 }
 
@@ -499,5 +399,106 @@ where
         internal_unit.rule = unit.rule;
         internal_unit.position = unit.position;
         internal_unit.feedback = unit.feedback;
+    }
+}
+
+pub fn build_lattice_with_memory(
+    n: usize,
+    m: usize,
+    memory_size: usize,
+    cognitive_unit_init_state: impl Fn((usize, usize)) -> CognitiveUnitPair,
+) -> CognitiveSpaceWithMemory {
+    let xy_to_index = |i: usize, j: usize| -> usize { i * m + j };
+
+    // let mut rng = thread_rng();
+
+    let mut graph =
+        StableGraph::<CognitiveUnitWithMemory, (), Undirected>::with_capacity(n * m, 8 * n * m);
+
+    let (nodes, positions): (Vec<_>, Vec<_>) = (0..n)
+        .cartesian_product(0..m)
+        .map(|position| {
+            // let state = self.initial_states.choose(&mut rng).unwrap().to_owned();
+            // let rule = self.rule.compile_prompt();
+
+            // let unit = CognitiveUnitWithMemory {
+            //     rule,
+            //     state,
+            //     position,
+            //     feedback: None,
+            // };
+
+            let first_unit = cognitive_unit_init_state(position);
+
+            let unit = CognitiveUnitWithMemory::new(
+                position,
+                vec![(
+                    Utc::now(),
+                    CognitiveUnitComplex {
+                        rule: first_unit.rule.clone(),
+                        state: first_unit.state.clone(),
+                        neighbors: vec![],
+                        feedback: "".to_string(),
+                    },
+                )],
+                memory_size,
+            );
+
+            (graph.add_node(unit.clone()), position)
+        })
+        .unzip();
+
+    positions.iter().for_each(|&(i, j)| {
+        let i_s1 = i.overflowing_sub(1).1.then(|| n - 1).unwrap_or(i);
+        let j_s1 = j.overflowing_sub(1).1.then(|| m - 1).unwrap_or(j);
+
+        let i_a1 = (i + 1) % n;
+        let j_a1 = (j + 1) % m;
+
+        let n_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j)]);
+        let ne_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j_a1)]);
+        let e_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i, j_a1)]);
+        let se_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j_a1)]);
+        let s_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j)]);
+        let sw_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_s1, j_s1)]);
+        let w_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i, j_s1)]);
+        let nw_edge = (nodes[xy_to_index(i, j)], nodes[xy_to_index(i_a1, j_s1)]);
+
+        if !graph.contains_edge(n_edge.0, n_edge.1) && n_edge.0 != n_edge.1 {
+            graph.add_edge(n_edge.0, n_edge.1, ());
+        }
+
+        if !graph.contains_edge(ne_edge.0, ne_edge.1) && ne_edge.0 != ne_edge.1 {
+            graph.add_edge(ne_edge.0, ne_edge.1, ());
+        }
+
+        if !graph.contains_edge(e_edge.0, e_edge.1) && e_edge.0 != e_edge.1 {
+            graph.add_edge(e_edge.0, e_edge.1, ());
+        }
+
+        if !graph.contains_edge(se_edge.0, se_edge.1) && se_edge.0 != se_edge.1 {
+            graph.add_edge(se_edge.0, se_edge.1, ());
+        }
+
+        if !graph.contains_edge(s_edge.0, s_edge.1) && s_edge.0 != s_edge.1 {
+            graph.add_edge(s_edge.0, s_edge.1, ());
+        }
+
+        if !graph.contains_edge(sw_edge.0, sw_edge.1) && sw_edge.0 != sw_edge.1 {
+            graph.add_edge(sw_edge.0, sw_edge.1, ());
+        }
+
+        if !graph.contains_edge(w_edge.0, w_edge.1) && w_edge.0 != w_edge.1 {
+            graph.add_edge(w_edge.0, w_edge.1, ());
+        }
+
+        if !graph.contains_edge(nw_edge.0, nw_edge.1) && nw_edge.0 != nw_edge.1 {
+            graph.add_edge(nw_edge.0, nw_edge.1, ());
+        }
+    });
+
+    CognitiveSpaceWithMemory {
+        // _rule: rule.clone(),
+        graph,
     }
 }

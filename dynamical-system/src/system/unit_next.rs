@@ -6,7 +6,7 @@ use schemars::{schema_for, JsonSchema};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::{api::ChatCompletionResponse, unit::CognitiveContext};
+use crate::{system::api::ChatCompletionResponse, system::unit::CognitiveContext};
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CognitiveUnitComplex {
@@ -43,8 +43,6 @@ impl CognitiveUnitComplex {
 
 #[derive(Debug, Clone, Default, Serialize, JsonSchema)]
 pub struct CognitiveUnitWithMemory {
-    pub system_message: String,
-
     pub memory: Vec<(DateTime<Utc>, CognitiveUnitComplex)>,
     pub memory_size: usize,
 
@@ -62,22 +60,10 @@ impl CognitiveUnitWithMemory {
         memory_size: usize,
     ) -> Self {
         // let cognitive_unit_description = CognitiveUnitWithMemory::self_description();
-        let pair_description = CognitiveUnitPair::self_description();
-
-        let system_message = [
-            "You're a LLM Cognitive Unit and your unique task is to respond with your next CognitiveUnitPair based on your rule and the states of your neighbors in json format", 
-            format!("Always respond with a plain json complaint with `CognitiveUnitPair`: {}", pair_description).as_str(),
-            "The user pass to you your memory and the neighborhood states as list of 'user messages' in json format",
-            // "Don't put the json in a code block, don't add explanations, just return the json ready to be parsed based on the schema",
-            "Only if you rule is empty, you may to propose a new rule and your return it with the response",
-            "If you think the rule is wrong, you may to propose a new rule and your return it with the response",
-            "Example of valid response: {\"rule\": \"rule_1\", \"state\": \"state_1\"}",
-        ]
-        .join(". ");
 
         Self {
             position,
-            system_message,
+
             memory,
             memory_size,
         }
@@ -116,8 +102,21 @@ impl CognitiveUnitWithMemory {
             .cloned()
             .collect::<Vec<_>>();
 
-        let res =
-            Self::generic_chat_completion(ctx, self.system_message.clone(), input_payload).await;
+        let pair_description = CognitiveUnitPair::self_description();
+
+        let system_message = [
+                "You're a LLM Cognitive Unit and your unique task is to respond with your next (rule, state) based on your current rule and the states of your neighbors in json format", 
+                // format!("Your current rule is: {}", self.memory.last().unwrap().1.rule).as_str(),
+                format!("Always respond with a plain json complaint with `CognitiveUnitPair`: {}", pair_description).as_str(),
+                "The user pass to you your memory and the neighborhood states as list of 'messages' in json format",
+                "Don't put the json in a code block, don't add explanations, just return the json ready to be parsed based on the schema",
+                "Only if you rule is empty, you may to propose a new rule and your return it with the response",
+                "If you think the rule is wrong, you may to propose a new rule and your return it with the response",
+                "Example of valid response: `{\"rule\": \"rule_1\", \"state\": \"state_1\"}`",
+            ]
+            .join(".\n");
+
+        let res = Self::generic_chat_completion(ctx, system_message, input_payload).await;
 
         let res_content = res
             .unwrap()

@@ -2,12 +2,10 @@ use std::{path::PathBuf, time};
 
 use dotenv::dotenv;
 
-use itertools::Itertools;
-
-use llmca::{
-    system::{MessageModelRule, VonNeumannLatticeCognitiveSpace},
-    unit_next::CognitiveUnitPair,
+use dynamical_system::{
+    system::space::build_lattice_with_memory, system::unit_next::CognitiveUnitPair,
 };
+use itertools::Itertools;
 
 use macroquad::prelude::*;
 use tokio::runtime::Runtime;
@@ -25,25 +23,18 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (10, 10);
+    let (n, m) = (3, 3);
 
-    let rule_text = "You represent a pixel in a sunset photography".to_string();
+    let rule = "you represent a color that evokes the sadness".to_string();
 
-    let rule = MessageModelRule::new(rule_text.clone(), vec![]);
-
-    let initial_states = [vec!["#aaaaaa".to_string()]].to_vec();
-
-    // let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states).build_lattice(n, m);
-
-    let mut space = VonNeumannLatticeCognitiveSpace::new(rule, initial_states)
-        .build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
-            rule: rule_text.clone(),
-            state: "#aaaaaa".to_string(),
-        });
+    let mut space = build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
+        rule: rule.clone(),
+        state: "#bababa".to_string(),
+    });
 
     let mut step = 0;
 
-    let hash = md5::compute(rule_text.as_bytes());
+    let hash = md5::compute(rule.as_bytes());
     let hash_string = format!("{:x}", hash);
 
     let timestamp = time::SystemTime::now()
@@ -69,7 +60,8 @@ async fn main() {
         let all_states = space
             .get_units()
             .iter()
-            .map(|u| serde_json::to_string(&u.memory.last().unwrap().1.state).unwrap())
+            .map(|u| u.memory.last().unwrap().1.state.clone())
+            // .unwrap()
             .collect::<Vec<_>>();
 
         let unique_states = all_states.iter().collect::<std::collections::HashSet<_>>();
@@ -88,7 +80,7 @@ async fn main() {
         );
 
         space.get_units().iter().for_each(|unit| {
-            let state = &serde_json::to_string(&unit.memory.last().unwrap().1.state).unwrap();
+            let state = &unit.memory.last().unwrap().1.state;
 
             let (p_x, p_y) = unit.position;
 

@@ -4,7 +4,7 @@ use schemars::{schema_for, JsonSchema};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::api::ChatCompletionResponse;
+use crate::system::api::ChatCompletionResponse;
 
 #[derive(Default, Debug, Clone)]
 pub struct CognitiveUnit {
