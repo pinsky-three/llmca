@@ -36,6 +36,24 @@ pub fn App() -> impl IntoView {
     }
 }
 
+// use serde::Deserialize;
+
+// #[derive(Deserialize, Debug)]
+// struct MyQuery {
+// foo: String,
+// }
+
+#[server]
+pub async fn server_function_example(title: String) -> Result<String, ServerFnError> {
+    use axum::{extract::Query, http::Method};
+    use leptos_axum::extract;
+
+    let method: Method = extract().await.unwrap();
+    // println!("method: {:?}", method);
+
+    Ok(method.to_string())
+}
+
 /// Renders the home page of your application.
 #[component]
 fn HomePage() -> impl IntoView {
@@ -46,5 +64,20 @@ fn HomePage() -> impl IntoView {
     view! {
         <h1>"Welcome to Leptos!"</h1>
         <button on:click=on_click>"Click Me: " {count}</button>
+
+        <Suspense
+            // the fallback will show initially
+            // on subsequent reloads, the current child will
+            // continue showing
+            fallback=move || view! { <p>"Loading..."</p> }
+        >
+            <button on:click=move |_| {
+                spawn_local(async {
+                    server_function_example("So much to do!".to_string()).await.unwrap();
+                });
+            }>
+                "Add Todo"
+            </button>
+        </Suspense>
     }
 }
