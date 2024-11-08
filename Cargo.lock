@@ -34,7 +34,7 @@ dependencies = [
  "accesskit_consumer",
  "atspi-common",
  "serde",
- "thiserror 1.0.64",
+ "thiserror",
  "zvariant",
 ]
 
@@ -175,7 +175,7 @@ dependencies = [
  "ndk-context",
  "ndk-sys 0.6.0+11769913",
  "num_enum",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -737,7 +737,7 @@ dependencies = [
  "hashbrown 0.13.2",
  "instant",
  "once_cell",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -769,7 +769,7 @@ dependencies = [
  "polling",
  "rustix",
  "slab",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -1349,7 +1349,7 @@ dependencies = [
  "egui",
  "epaint",
  "log",
- "thiserror 1.0.64",
+ "thiserror",
  "type-map",
  "web-time",
  "wgpu",
@@ -1825,7 +1825,7 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_json",
- "thiserror 1.0.64",
+ "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1961,7 +1961,7 @@ checksum = "fdd4240fc91d3433d5e5b0fc5b67672d771850dc19bbee03c1381e19322803d7"
 dependencies = [
  "log",
  "presser",
- "thiserror 1.0.64",
+ "thiserror",
  "winapi",
  "windows 0.52.0",
 ]
@@ -2050,7 +2050,7 @@ dependencies = [
  "com",
  "libc",
  "libloading",
- "thiserror 1.0.64",
+ "thiserror",
  "widestring",
  "winapi",
 ]
@@ -2532,7 +2532,7 @@ dependencies = [
  "combine",
  "jni-sys",
  "log",
- "thiserror 1.0.64",
+ "thiserror",
  "walkdir",
  "windows-sys 0.45.0",
 ]
@@ -2659,7 +2659,7 @@ dependencies = [
  "config",
  "regex",
  "serde",
- "thiserror 1.0.64",
+ "thiserror",
  "typed-builder",
 ]
 
@@ -2782,7 +2782,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "slotmap",
- "thiserror 1.0.64",
+ "thiserror",
  "tokio",
  "tracing",
  "wasm-bindgen",
@@ -2814,7 +2814,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_qs 0.13.0",
- "thiserror 1.0.64",
+ "thiserror",
  "tracing",
  "url",
  "wasm-bindgen",
@@ -2834,7 +2834,7 @@ dependencies = [
  "leptos_reactive",
  "serde",
  "server_fn",
- "thiserror 1.0.64",
+ "thiserror",
  "tracing",
 ]
 
@@ -2887,9 +2887,9 @@ dependencies = [
  "leptos_axum",
  "leptos_meta",
  "leptos_router",
- "thiserror 2.0.0",
+ "thiserror",
  "tokio",
- "tower 0.5.1",
+ "tower 0.4.13",
  "tower-http",
  "tracing",
  "wasm-bindgen",
@@ -3179,7 +3179,7 @@ dependencies = [
  "rustc-hash",
  "spirv",
  "termcolor",
- "thiserror 1.0.64",
+ "thiserror",
  "unicode-xid",
 ]
 
@@ -3212,7 +3212,7 @@ dependencies = [
  "ndk-sys 0.6.0+11769913",
  "num_enum",
  "raw-window-handle",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -3585,7 +3585,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c51ebcefb2f0b9a5e0bea115532c8ae4215d1b01eff176d0f4ba4192895c2708"
 dependencies = [
  "serde",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -4077,7 +4077,7 @@ dependencies = [
  "rand_chacha",
  "simd_helpers",
  "system-deps",
- "thiserror 1.0.64",
+ "thiserror",
  "v_frame",
  "wasm-bindgen",
 ]
@@ -4252,7 +4252,7 @@ dependencies = [
  "quote",
  "syn 2.0.87",
  "syn_derive",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -4510,7 +4510,7 @@ checksum = "0431a35568651e363364210c91983c1da5eb29404d9f0928b67d4ebcfa7d330c"
 dependencies = [
  "percent-encoding",
  "serde",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -4521,7 +4521,7 @@ checksum = "cd34f36fe4c5ba9654417139a9b3a20d2e1de6012ee678ad14d240c22c78d8d6"
 dependencies = [
  "percent-encoding",
  "serde",
- "thiserror 1.0.64",
+ "thiserror",
 ]
 
 [[package]]
@@ -4589,7 +4589,7 @@ dependencies = [
  "serde_json",
  "serde_qs 0.12.0",
  "server_fn_macro_default",
- "thiserror 1.0.64",
+ "thiserror",
  "tower 0.4.13",
  "tower-layer",
  "url",
@@ -4698,7 +4698,7 @@ dependencies = [
  "log",
  "memmap2",
  "rustix",
- "thiserror 1.0.64",
+ "thiserror",
  "wayland-backend",
  "wayland-client",
  "wayland-csd-frame",
@@ -4924,16 +4924,7 @@ version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d50af8abc119fb8bb6dbabcfa89656f46f84aa0ac7688088608076ad2b459a84"
 dependencies = [
- "thiserror-impl 1.0.64",
-]
-
-[[package]]
-name = "thiserror"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15291287e9bff1bc6f9ff3409ed9af665bec7a5fc8ac079ea96be07bca0e2668"
-dependencies = [
- "thiserror-impl 2.0.0",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -4941,17 +4932,6 @@ name = "thiserror-impl"
 version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08904e7672f5eb876eaaf87e0ce17857500934f4981c4a0ab2b4aa98baac7fc3"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22efd00f33f93fa62848a7cab956c3d38c8d43095efda1decfc2b3a5dc0b8972"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5148,9 +5128,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8437150ab6bbc8c5f0f519e3d5ed4aa883a83dd4cdd3d1b21f9482936046cb97"
+checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
 dependencies = [
  "bitflags 2.6.0",
  "bytes",
@@ -5684,7 +5664,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash",
  "smallvec",
- "thiserror 1.0.64",
+ "thiserror",
  "wgpu-hal",
  "wgpu-types",
 ]
@@ -5723,7 +5703,7 @@ dependencies = [
  "renderdoc-sys",
  "rustc-hash",
  "smallvec",
- "thiserror 1.0.64",
+ "thiserror",
  "wasm-bindgen",
  "web-sys",
  "wgpu-types",
