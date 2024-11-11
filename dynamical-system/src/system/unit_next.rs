@@ -129,6 +129,7 @@ impl CognitiveUnitWithMemory {
             .content;
 
         let res_content = res_content
+            .trim_matches(['`', '[', ']', '\n'])
             .trim_start_matches("json")
             .trim_matches(['`', '[', ']', '\n'])
             .to_string();
