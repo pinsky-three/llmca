@@ -1263,7 +1263,6 @@ name = "dynamical-system"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "dotenv",
  "futures",
  "itertools 0.13.0",
  "kdam",
@@ -2882,6 +2881,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "console_error_panic_hook",
+ "dynamical-system",
  "http",
  "leptos",
  "leptos_axum",

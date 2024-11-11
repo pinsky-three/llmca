@@ -25,7 +25,7 @@ async fn main() {
 
     let (n, m) = (3, 3);
 
-    let rule = "you represent a color that evokes the sadness".to_string();
+    let rule = "blues always with #rrggbb format".to_string();
 
     let mut space = build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
         rule: rule.clone(),
@@ -60,7 +60,7 @@ async fn main() {
         let all_states = space
             .get_units()
             .iter()
-            .map(|u| u.memory.last().unwrap().1.state.clone())
+            .map(|u| u.memory.last().unwrap().state.clone())
             // .unwrap()
             .collect::<Vec<_>>();
 
@@ -80,7 +80,7 @@ async fn main() {
         );
 
         space.get_units().iter().for_each(|unit| {
-            let state = &unit.memory.last().unwrap().1.state;
+            let state = &unit.memory.last().unwrap().state;
 
             let (p_x, p_y) = unit.position;
 

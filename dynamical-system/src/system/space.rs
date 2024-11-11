@@ -6,7 +6,7 @@ use petgraph::{stable_graph::StableGraph, Undirected};
 use rand::{seq::SliceRandom, thread_rng};
 use reqwest::Client;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 // use serde_derive::Serialize;
 
 use crate::{
@@ -24,7 +24,7 @@ where
     graph: StableGraph<CognitiveUnit, (), Undirected>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CognitiveSpaceWithMemory {
     // _rule: Box<R>,
     graph: StableGraph<CognitiveUnitWithMemory, (), Undirected>,
@@ -175,6 +175,10 @@ where
 }
 
 impl CognitiveSpaceWithMemory {
+    pub fn load_from_json(json: &str) -> Self {
+        serde_json::from_str(json).unwrap()
+    }
+
     pub async fn distributed_step(&mut self) {
         let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
@@ -220,7 +224,7 @@ impl CognitiveSpaceWithMemory {
 
                         // (
                         // format!("n_{}", neighbor.index()),
-                        neighbor_unit.memory.last().unwrap().1.to_pair()
+                        neighbor_unit.memory.last().unwrap().to_pair()
                         // )
                     })
                     .collect::<Vec<_>>();
@@ -251,7 +255,7 @@ impl CognitiveSpaceWithMemory {
                 // unit.state = next_state.calculated_state;
                 // unit.feedback = next_state.feedback;
 
-                unit.add_memory((Utc::now(), next_state));
+                unit.add_memory(next_state);
 
                 pb.update(1).ok();
             }
@@ -432,15 +436,13 @@ pub fn build_lattice_with_memory(
 
             let unit = CognitiveUnitWithMemory::new(
                 position,
-                vec![(
-                    Utc::now(),
-                    CognitiveUnitComplex {
-                        rule: first_unit.rule.clone(),
-                        state: first_unit.state.clone(),
-                        neighbors: vec![],
-                        feedback: "".to_string(),
-                    },
-                )],
+                vec![CognitiveUnitComplex {
+                    timestamp: Utc::now(),
+                    rule: first_unit.rule.clone(),
+                    state: first_unit.state.clone(),
+                    neighbors: vec![],
+                    feedback: "".to_string(),
+                }],
                 memory_size,
             );
 

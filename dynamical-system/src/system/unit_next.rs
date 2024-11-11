@@ -10,6 +10,7 @@ use crate::{system::api::ChatCompletionResponse, system::unit::CognitiveContext}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CognitiveUnitComplex {
+    pub timestamp: DateTime<Utc>,
     pub rule: String,
     pub state: String,          // in json format
     pub neighbors: Vec<String>, // in json format
@@ -41,9 +42,9 @@ impl CognitiveUnitComplex {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Default, Serialize, JsonSchema, Deserialize)]
 pub struct CognitiveUnitWithMemory {
-    pub memory: Vec<(DateTime<Utc>, CognitiveUnitComplex)>,
+    pub memory: Vec<CognitiveUnitComplex>,
     pub memory_size: usize,
 
     pub position: (usize, usize),
@@ -56,7 +57,7 @@ impl CognitiveUnitWithMemory {
 
     pub fn new(
         position: (usize, usize),
-        memory: Vec<(DateTime<Utc>, CognitiveUnitComplex)>,
+        memory: Vec<CognitiveUnitComplex>,
         memory_size: usize,
     ) -> Self {
         // let cognitive_unit_description = CognitiveUnitWithMemory::self_description();
@@ -69,7 +70,7 @@ impl CognitiveUnitWithMemory {
         }
     }
 
-    pub fn add_memory(&mut self, memory: (DateTime<Utc>, CognitiveUnitComplex)) {
+    pub fn add_memory(&mut self, memory: CognitiveUnitComplex) {
         self.memory.push(memory);
 
         if self.memory.len() > self.memory_size {
@@ -87,7 +88,7 @@ impl CognitiveUnitWithMemory {
             .chain(
                 self.memory
                     .iter()
-                    .map(|m| serde_json::to_string_pretty(&m.1.to_pair()).unwrap())
+                    .map(|m| serde_json::to_string_pretty(&m.to_pair()).unwrap())
                     .collect::<Vec<String>>()
                     .iter(),
             )
@@ -128,24 +129,26 @@ impl CognitiveUnitWithMemory {
             .content;
 
         let res_content = res_content
-            .trim_matches(['`', '[', ']', '\n'])
             .trim_start_matches("json")
+            .trim_matches(['`', '[', ']', '\n'])
             .to_string();
 
         println!("res_content: {:?}", res_content);
 
         match serde_json::from_str::<CognitiveUnitPair>(&res_content) {
             Ok(output) => CognitiveUnitComplex {
+                timestamp: Utc::now(),
                 rule: output.rule,
                 state: output.state,
                 neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
                 feedback: "".to_string(),
             },
             Err(err) => CognitiveUnitComplex {
-                rule: self.memory.last().unwrap().1.rule.clone(),
-                state: self.memory.last().unwrap().1.state.clone(),
+                timestamp: Utc::now(),
+                rule: self.memory.last().unwrap().rule.clone(),
+                state: self.memory.last().unwrap().state.clone(),
                 neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
-                feedback: format!("Response Content: {}. Error: {}", res_content, err),
+                feedback: format!("Response Content: `{}`. Error: `{}`", res_content, err),
             },
         }
     }

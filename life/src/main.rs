@@ -2,11 +2,36 @@
 #[tokio::main]
 async fn main() {
     use axum::Router;
+    // use dynamical_system::{
+    //     system::space::build_lattice_with_memory, system::unit_next::CognitiveUnitPair,
+    // };
     use leptos::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use life::app::*;
     use life::fileserv::file_and_error_handler;
 
+    // use axum::extract::FromRef;
+    // use dynamical_system::system::space::CognitiveSpaceWithMemory;
+
+    // // #[derive(FromRef, Debug, Clone)]
+    // // pub struct AppState {
+    // //     // pub leptos_options: LeptosOptions,
+    // //     // pub space: CognitiveSpaceWithMemory,
+    // //     pub space_serialized: String,
+    // // }
+
+    // let (n, m) = (10, 10);
+
+    // let rule = "you represent a color that evokes the sadness".to_string();
+
+    // let space = build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
+    //     rule: rule.clone(),
+    //     state: "#bababa".to_string(),
+    // });
+
+    // let space_serialized = space.serialize_in_pretty_json();
+
+    // let state = AppState { space_serialized };
     // Setting get_configuration(None) means we'll be using cargo-leptos's env values
     // For deployment these variables are:
     // <https://github.com/leptos-rs/start-axum#executing-a-server-on-a-remote-machine-without-the-toolchain>
@@ -22,6 +47,7 @@ async fn main() {
         .leptos_routes(&leptos_options, routes, App)
         .fallback(file_and_error_handler)
         .with_state(leptos_options);
+    // .with_state(space);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     logging::log!("listening on http://{}", &addr);

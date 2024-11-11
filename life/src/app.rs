@@ -5,20 +5,11 @@ use leptos_router::*;
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
 
     view! {
-
-
-        // injects a stylesheet into the document <head>
-        // id=leptos means cargo-leptos will hot-reload this stylesheet
         <Stylesheet id="leptos" href="/pkg/life.css"/>
-
-        // sets the document title
         <Title text="Welcome to Leptos"/>
-
-        // content for this welcome page
         <Router fallback=|| {
             let mut outside_errors = Errors::default();
             outside_errors.insert_with_default_key(AppError::NotFound);
@@ -36,22 +27,31 @@ pub fn App() -> impl IntoView {
     }
 }
 
-// use serde::Deserialize;
-
-// #[derive(Deserialize, Debug)]
-// struct MyQuery {
-// foo: String,
-// }
-
 #[server]
-pub async fn server_function_example(title: String) -> Result<String, ServerFnError> {
-    use axum::{extract::Query, http::Method};
-    use leptos_axum::extract;
+pub async fn server_function_example(_title: String) -> Result<String, ServerFnError> {
+    // use axum::http::Method;
+    // use leptos_axum::extract;
+    // use axum::extract::Query;
+    use dynamical_system::{
+        system::space::build_lattice_with_memory, system::unit_next::CognitiveUnitPair,
+    };
 
-    let method: Method = extract().await.unwrap();
+    // let method: Method = extract().await.unwrap();
+
+    let (n, m) = (5, 5);
+
+    let rule = "you represent a color that evokes the sadness".to_string();
+
+    let space = build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
+        rule: rule.clone(),
+        state: "#bababa".to_string(),
+    });
+
     // println!("method: {:?}", method);
 
-    Ok(method.to_string())
+    let space_serialized = space.serialize_in_pretty_json();
+
+    Ok(space_serialized)
 }
 
 /// Renders the home page of your application.
@@ -78,6 +78,21 @@ fn HomePage() -> impl IntoView {
             }>
                 "Add Todo"
             </button>
+            <div>
+                <CognitiveUnit rule="".to_string() state="".to_string()/>
+            </div>
         </Suspense>
+    }
+}
+
+#[component]
+fn CognitiveUnit(rule: String, state: String) -> impl IntoView {
+    let (n, m) = (5, 5);
+
+    view! {
+        <div>
+            <p>"Cognitive Unit"</p>
+            // <p>"This is a cognitive unit."</p>
+        </div>
     }
 }
