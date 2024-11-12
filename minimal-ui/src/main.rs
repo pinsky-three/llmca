@@ -23,9 +23,9 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
-    let (n, m) = (3, 3);
+    let (n, m) = (5, 5);
 
-    let rule = "blues always with #rrggbb format".to_string();
+    let rule = "you represent a pixel in a monochromatic image. (e.g. #rrggbb)".to_string();
 
     let mut space = build_lattice_with_memory(n, m, 4, |_pos| CognitiveUnitPair {
         rule: rule.clone(),

@@ -106,8 +106,7 @@ impl CognitiveUnitWithMemory {
         let pair_description = CognitiveUnitPair::self_description();
 
         let system_message = [
-                "You're a LLM Cognitive Unit and your unique task is to respond with your next (rule, state) based on your current rule and the states of your neighbors in json format", 
-                // format!("Your current rule is: {}", self.memory.last().unwrap().1.rule).as_str(),
+                "You're a LLM Cognitive Unit and your unique task is to respond with your next (rule, state) based on your current rule and the states of your neighbors in json format",
                 format!("Always respond with a plain json complaint with `CognitiveUnitPair`: {}", pair_description).as_str(),
                 "The user pass to you your memory and the neighborhood states as list of 'messages' in json format",
                 "Don't put the json in a code block, don't add explanations, just return the json ready to be parsed based on the schema",
@@ -129,12 +128,12 @@ impl CognitiveUnitWithMemory {
             .content;
 
         let res_content = res_content
-            .trim_matches(['`', '[', ']', '\n'])
-            .trim_start_matches("json")
-            .trim_matches(['`', '[', ']', '\n'])
+            .trim_matches(['`', '[', ']', '\n', 'j', 's', 'o', 'n'])
+            // .trim_start_matches("json")
+            // .trim_matches(['`', '[', ']', '\n'])
             .to_string();
 
-        println!("res_content: {:?}", res_content);
+        println!("res_content: [{:?}]`", res_content);
 
         match serde_json::from_str::<CognitiveUnitPair>(&res_content) {
             Ok(output) => CognitiveUnitComplex {
@@ -181,8 +180,6 @@ impl CognitiveUnitWithMemory {
             "messages": messages,
         });
 
-        // println!("body: {:?}", body);
-
         let res = ctx
             .client
             .post(format!("{}/chat/completions", ctx.base_api))
@@ -191,8 +188,6 @@ impl CognitiveUnitWithMemory {
             .send()
             .await
             .unwrap();
-
-        // println!("res: {:?}", res);
 
         let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
 
