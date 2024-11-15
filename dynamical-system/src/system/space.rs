@@ -191,7 +191,9 @@ impl CognitiveSpaceWithMemory {
             .split(',')
             .map(|s| s.trim())
             .collect::<Vec<_>>();
+
         let models = models.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+
         let secret_keys = secret_keys.split(',').map(|s| s.trim()).collect::<Vec<_>>();
 
         if base_api_urls.len() != models.len() || models.len() != secret_keys.len() {
@@ -250,7 +252,11 @@ impl CognitiveSpaceWithMemory {
                 let node = chunk[i];
                 let unit = self.graph.node_weight_mut(node).unwrap();
 
-                let next_state = next_state.unwrap();
+                let next_state = next_state.unwrap_or_else(|err| {
+                    println!("err: {:?}", err);
+
+                    CognitiveUnitComplex::default()
+                });
 
                 // unit.state = next_state.calculated_state;
                 // unit.feedback = next_state.feedback;

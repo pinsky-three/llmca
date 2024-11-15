@@ -29,6 +29,18 @@ impl CognitiveUnitPair {
     }
 }
 
+impl Default for CognitiveUnitComplex {
+    fn default() -> Self {
+        Self {
+            timestamp: Utc::now(),
+            rule: "".to_string(),
+            state: "".to_string(),
+            neighbors: vec![],
+            feedback: "".to_string(),
+        }
+    }
+}
+
 impl CognitiveUnitComplex {
     pub fn self_description() -> String {
         serde_json::to_string_pretty(&schema_for!(CognitiveUnitComplex)).unwrap()
