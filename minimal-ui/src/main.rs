@@ -26,7 +26,7 @@ async fn main() {
     let initial_state = (0..size.0)
         .cartesian_product(0..size.1)
         .map(|_p| CognitiveUnitPair {
-            rule: "you're a pixel in a sea video, change your state to create a emotive scene"
+            rule: "you're a pixel in a sunset video, update your state to create a emotive scene"
                 .to_string(),
             state: "#bababa".to_string(),
         })

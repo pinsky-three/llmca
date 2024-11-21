@@ -68,7 +68,7 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
 
 2. Run the simulation:
     ```bash
-    cargo run
+    cargo run -p minimal-ui
     ```
 
 3. The simulation will open a window displaying the evolution of the cellular automaton grid. The states of each cell are represented by colors based on their hexadecimal values.
