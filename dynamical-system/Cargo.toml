@@ -7,12 +7,12 @@ edition = "2021"
 [dependencies]
 futures = "0.3.31"
 itertools = "0.13.0"
-kdam = "0.6.0"
+kdam = "0.6.1"
 md5 = "0.7.0"
 rand = "0.8.5"
-serde = "1.0.214"
-serde_derive = "1.0.214"
-serde_json = "1.0.132"
+serde = "1.0.215"
+serde_derive = "1.0.215"
+serde_json = "1.0.133"
 petgraph = { version = "0.6.5", features = ["serde-1"] }
 reqwest = { version = "0.12.9", features = ["blocking", "json"] }
 schemars = { version = "0.8.21", features = ["chrono"] }

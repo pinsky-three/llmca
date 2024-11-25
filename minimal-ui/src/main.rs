@@ -19,6 +19,8 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
 
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
     let manager = LifeManager::default();
 
     let size = (10, 10);
@@ -70,7 +72,9 @@ async fn main() {
 
         next_frame().await;
 
-        entity.evolve().await;
+        rt.block_on(async {
+            entity.evolve().await;
+        });
     }
 }
 

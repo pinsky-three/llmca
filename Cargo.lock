@@ -2209,9 +2209,9 @@ dependencies = [
 
 [[package]]
 name = "kdam"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0adf504eb0c61c2da8c5d674a1243db8b2320d44686be22a6c7c8aa7d2dbf6bf"
+checksum = "a2c4fb4d72f2f81859e6bc80257ef34b518f2bbe5229c33c739251e160b2663f"
 dependencies = [
  "terminal_size",
  "windows-sys 0.59.0",
@@ -3582,9 +3582,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
+checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
 dependencies = [
  "itoa",
  "memchr",
@@ -3622,6 +3622,18 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "dotenv",
+ "dynamical-system",
+ "image 0.25.5",
+ "itertools 0.13.0",
+ "md5",
+ "tokio",
 ]
 
 [[package]]
