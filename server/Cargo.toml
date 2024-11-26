@@ -10,3 +10,6 @@ itertools = "0.13.0"
 md5 = "0.7.0"
 tokio = { version = "1.41.1", features = ["full"] }
 dynamical-system = { path = "../dynamical-system" }
+poem = "3.1.5"
+poem-openapi = { version = "5.1.4", features = ["swagger-ui"] }
+serde_json = "1.0.133"
