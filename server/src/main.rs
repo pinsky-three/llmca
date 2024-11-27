@@ -27,6 +27,13 @@ impl Api {
 
         Json(json!({ "entities": entities }))
     }
+
+    #[oai(path = "/life", method = "post")]
+    async fn create_life(&self, id: Json<String>) -> Json<Value> {
+        let entity = self.life_manager.register_entity(id.0);
+
+        Json(json!({ "entity": entity }))
+    }
 }
 
 #[tokio::main]

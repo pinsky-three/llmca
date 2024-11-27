@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
+use super::entity::Entity;
+
 pub struct LifeManager {
     root_folder: PathBuf,
+    loaded_entities: Vec<Entity>,
 }
 
 impl Default for LifeManager {
@@ -12,7 +15,17 @@ impl Default for LifeManager {
             std::fs::create_dir(&root_folder).unwrap();
         }
 
-        Self { root_folder }
+        let mut instance = Self {
+            root_folder,
+            loaded_entities: vec![],
+        };
+
+        instance.list_entities().iter().for_each(|entity_folder| {
+            let entity = Entity::open_saved(entity_folder.clone());
+            instance.loaded_entities.push(entity);
+        });
+
+        instance
     }
 }
 
@@ -30,5 +43,9 @@ impl LifeManager {
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect()
+    }
+
+    pub fn get_entity(&self, id: &str) -> Option<&Entity> {
+        self.loaded_entities.iter().find(|entity| entity.id() == id)
     }
 }

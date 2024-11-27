@@ -50,6 +50,10 @@ impl Entity {
         ent
     }
 
+    pub fn id(&self) -> &str {
+        &self._id
+    }
+
     pub fn save_serialized(&self) {
         let ser_space = self.space.serialize_in_pretty_json();
 
