@@ -21,7 +21,10 @@ impl Default for LifeManager {
         };
 
         instance.list_entities().iter().for_each(|entity_folder| {
-            let entity = Entity::open_saved(entity_folder.clone());
+            let folder_name = instance.root_folder.join(entity_folder.clone());
+            println!("Loading entity from {:?}", folder_name);
+
+            let entity = Entity::open_saved(folder_name);
             instance.loaded_entities.push(entity);
         });
 
@@ -30,6 +33,10 @@ impl Default for LifeManager {
 }
 
 impl LifeManager {
+    pub fn root_folder(&self) -> &PathBuf {
+        &self.root_folder
+    }
+
     pub fn register_entity(&self, id: String) -> PathBuf {
         let entity_folder = self.root_folder.join(&id);
 
@@ -38,14 +45,27 @@ impl LifeManager {
         entity_folder
     }
 
-    pub fn list_entities(&self) -> Vec<PathBuf> {
+    pub fn list_entities(&self) -> Vec<String> {
         std::fs::read_dir(&self.root_folder)
             .unwrap()
-            .map(|entry| entry.unwrap().path())
+            .map(|entry| {
+                entry
+                    .unwrap()
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            })
             .collect()
     }
 
     pub fn get_entity(&self, id: &str) -> Option<&Entity> {
         self.loaded_entities.iter().find(|entity| entity.id() == id)
+    }
+
+    pub fn get_all_entities(&self) -> &Vec<Entity> {
+        &self.loaded_entities
     }
 }

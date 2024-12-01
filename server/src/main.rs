@@ -1,7 +1,7 @@
 use dynamical_system::life::manager::LifeManager;
 use poem::{listener::TcpListener, Route};
 use poem_openapi::{
-    param::Query,
+    param::{Path, Query},
     payload::{Json, PlainText},
     OpenApi, OpenApiService,
 };
@@ -33,6 +33,16 @@ impl Api {
         let entity = self.life_manager.register_entity(id.0);
 
         Json(json!({ "entity": entity }))
+    }
+
+    #[oai(path = "/life/:id", method = "get")]
+    async fn get_life(&self, id: Path<String>) -> Json<Value> {
+        let entity = self.life_manager.get_entity(&id.0);
+
+        match entity {
+            Some(entity) => Json(json!({ "entity": entity })),
+            None => Json(json!({ "error": "entity not found" })),
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 use std::{collections::HashSet, fs::read_dir, path::PathBuf, time};
 
+use serde_derive::{Deserialize, Serialize};
+
 use crate::system::{
     space::{build_lattice_with_memory, CognitiveSpaceWithMemory},
     unit_next::CognitiveUnitPair,
@@ -7,6 +9,7 @@ use crate::system::{
 
 use super::manager::LifeManager;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Entity {
     _id: String,
     artifacts_folder: PathBuf,
