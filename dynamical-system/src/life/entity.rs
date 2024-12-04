@@ -17,6 +17,11 @@ pub struct Entity {
     step: u32,
 }
 
+pub enum EntityStatus {
+    ComputingStep(u32),
+    Idle,
+}
+
 impl Entity {
     pub fn new_2d_lattice(
         manager: &LifeManager,
@@ -111,13 +116,6 @@ impl Entity {
         self.step
     }
 
-    pub async fn evolve(&mut self) {
-        self.space.distributed_step().await;
-        self.step += 1;
-
-        self.save_serialized();
-    }
-
     pub fn space(&self) -> &CognitiveSpaceWithMemory {
         &self.space
     }
@@ -133,5 +131,12 @@ impl Entity {
         let unique_states = all_states.iter().cloned().collect::<HashSet<_>>();
 
         unique_states
+    }
+
+    pub async fn evolve(&mut self) {
+        self.space.distributed_step().await;
+        self.step += 1;
+
+        self.save_serialized();
     }
 }
