@@ -3,7 +3,7 @@ use chrono::Utc;
 use itertools::Itertools;
 use kdam::{tqdm, BarExt};
 use petgraph::{stable_graph::StableGraph, Undirected};
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{rngs::ThreadRng, seq::SliceRandom, thread_rng};
 use reqwest::Client;
 
 use serde::{Deserialize, Serialize};
@@ -180,7 +180,11 @@ impl CognitiveSpaceWithMemory {
     }
 
     pub async fn distributed_step(&mut self) {
-        let nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
+        let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
+
+        let mut rng = ThreadRng::default();
+
+        nodes.shuffle(&mut rng);
 
         let base_api_urls =
             env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string());
