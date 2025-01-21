@@ -1,5 +1,5 @@
 use dynamical_system::life::manager::LifeManager;
-use poem::{listener::TcpListener, Route};
+use poem::{listener::TcpListener, middleware::Cors, EndpointExt, Route};
 use poem_openapi::{
     param::{Path, Query},
     payload::{Json, PlainText},
@@ -55,12 +55,17 @@ async fn main() -> Result<(), std::io::Error> {
         "Hello World",
         "1.0",
     )
-    .server("http://localhost:3000/api");
+    .server("http://localhost:8000/api");
 
     let ui = api_service.swagger_ui();
-    let app = Route::new().nest("/api", api_service).nest("/", ui);
+    let app = Route::new().nest("/api", api_service).nest("/", ui).with(
+        Cors::new()
+            .allow_origin("*")
+            .allow_methods(vec!["GET", "POST", "OPTIONS"])
+            .allow_headers(vec!["Content-Type", "Authorization"]),
+    );
 
-    poem::Server::new(TcpListener::bind("0.0.0.0:3000"))
+    poem::Server::new(TcpListener::bind("0.0.0.0:8000"))
         .run(app)
         .await
 }
