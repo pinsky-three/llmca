@@ -6,10 +6,12 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 image = "0.25.5"
-itertools = "0.13.0"
+itertools = "0.14.0"
 md5 = "0.7.0"
-tokio = { version = "1.41.1", features = ["full"] }
+tokio = { version = "1.43.0", features = ["full"] }
 dynamical-system = { path = "../dynamical-system" }
-poem = "3.1.5"
-poem-openapi = { version = "5.1.4", features = ["swagger-ui"] }
-serde_json = "1.0.133"
+poem = "3.1.6"
+poem-openapi = { version = "5.1.5", features = ["swagger-ui"] }
+serde_json = "1.0.137"
+serde_derive = "1.0.217"
+serde = "1.0.217"
