@@ -4,3 +4,4 @@ saves
 .DS_Store
 example.ts
 .life
+resolvers.toml

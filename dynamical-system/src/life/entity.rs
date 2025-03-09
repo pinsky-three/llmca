@@ -1,6 +1,7 @@
-use std::{collections::HashSet, fs::read_dir, path::PathBuf, time};
+use std::{collections::HashSet, fs::read_dir, path::PathBuf, sync::Arc, time};
 
 use serde_derive::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 use crate::system::{
     space::{build_lattice_with_memory, load_llm_resolvers_from_env, CognitiveSpaceWithMemory},
@@ -156,22 +157,31 @@ impl Entity {
     }
 
     pub fn evolve(&mut self, runtime: &tokio::runtime::Runtime) {
-        self.state = EntityState::ComputingStep(self.step + 1);
+        // self.state = EntityState::ComputingStep(self.step + 1);
+        let entity_ptr = self.clone().to_owned(); // raw pointer is safe if you guarantee it won't drop
 
-        let mut self_clone = self.clone();
+        let shared_self = Arc::new(Mutex::new(entity_ptr));
 
         let resolvers = load_llm_resolvers_from_env();
 
+        let cloned_self = Arc::clone(&shared_self);
+
         runtime.spawn(async move {
-            self_clone
+            cloned_self
+                .lock()
+                .await
+                .to_owned()
+                // .as_ref()
+                // .unwrap()
                 .space
                 .distributed_step_with_tasks(resolvers)
                 .await;
-            self_clone.step += 1;
 
-            self_clone.save_serialized();
+            let mut self_locked = cloned_self.lock().await;
 
-            self_clone.state = EntityState::Idle;
+            self_locked.step += 1;
+            self_locked.save_serialized();
+            self_locked.state = EntityState::Idle;
         });
     }
 }

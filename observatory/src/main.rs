@@ -78,21 +78,37 @@ impl eframe::App for LifeManagerApp {
                     self.current_step = self.loaded_entity.clone().unwrap().current_step() as usize;
                 }
 
-                if self.loaded_entity.is_some() && ui.button("evolve").clicked() {
-                    // self.runtime.block_on(async {
-                    // });
-                    self.loaded_entity.as_mut().unwrap().evolve(&self.runtime);
-                }
-
                 if let Some(entity) = self.loaded_entity.as_mut() {
+                    if let EntityState::ComputingStep(_step) = entity.state() {
+                        ui.disable();
+                    }
+
+                    if ui.button("evolve").clicked() {
+                        entity.evolve(&self.runtime);
+                    }
+
                     if let EntityState::ComputingStep(step) = entity.state() {
                         ui.label(format!("Computing step {}", step));
 
                         let tasks = entity.space_at(self.current_step).computing_tasks();
 
-                        let total = tasks.first().unwrap().total_units;
+                        println!("len tasks: {}", tasks.len());
 
-                        ui.add(egui::ProgressBar::new(tasks.len() as f32 / total as f32));
+                        // let total = tasks.first().unwrap().total_units;
+                        let total = self
+                            .loaded_entity
+                            .as_ref()
+                            .unwrap()
+                            .space()
+                            .get_units()
+                            .len();
+
+                        println!("len total: {}", total);
+
+                        ui.add(
+                            egui::ProgressBar::new(tasks.len() as f32 / total as f32)
+                                .desired_width(100.0),
+                        );
                     }
                 }
             });

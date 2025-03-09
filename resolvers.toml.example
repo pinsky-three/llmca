@@ -1,0 +1,10 @@
+[[resolvers]]
+api_url = "https://openrouter.ai/api/v1"
+api_key = "your_key"
+model_name = "deepseek/deepseek-r1-distill-qwen-1.5b"
+
+[[resolvers]]
+api_url = "http://localhost:9000/api/v1"
+api_key = "_"
+model_name = "llama3.2"
+
