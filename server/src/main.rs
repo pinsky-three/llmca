@@ -60,7 +60,7 @@ impl Api {
 
         match life_manager.get_mut_entity(&id.0) {
             Some(entity) => {
-                entity.evolve().await;
+                entity.evolve_async().await;
                 Json(json!({ "status": "done" }))
             }
             None => Json(json!({ "error": "entity not found" })),

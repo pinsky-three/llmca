@@ -73,7 +73,7 @@ async fn main() {
         next_frame().await;
 
         rt.block_on(async {
-            entity.evolve().await;
+            entity.evolve_async().await;
         });
     }
 }

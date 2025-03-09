@@ -1,7 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use dotenvy::dotenv;
-use dynamical_system::life::{entity::Entity, manager::LifeManager};
+use dynamical_system::life::{
+    entity::{Entity, EntityState},
+    manager::LifeManager,
+};
 use eframe::egui::{self, CornerRadius, Frame, Margin, Sense, Slider, UiBuilder, Vec2};
 
 fn main() -> eframe::Result {
@@ -73,6 +76,24 @@ impl eframe::App for LifeManagerApp {
                         .cloned();
 
                     self.current_step = self.loaded_entity.clone().unwrap().current_step() as usize;
+                }
+
+                if self.loaded_entity.is_some() && ui.button("evolve").clicked() {
+                    // self.runtime.block_on(async {
+                    // });
+                    self.loaded_entity.as_mut().unwrap().evolve(&self.runtime);
+                }
+
+                if let Some(entity) = self.loaded_entity.as_mut() {
+                    if let EntityState::ComputingStep(step) = entity.state() {
+                        ui.label(format!("Computing step {}", step));
+
+                        let tasks = entity.space_at(self.current_step).computing_tasks();
+
+                        let total = tasks.first().unwrap().total_units;
+
+                        ui.add(egui::ProgressBar::new(tasks.len() as f32 / total as f32));
+                    }
                 }
             });
 
@@ -151,11 +172,11 @@ impl eframe::App for LifeManagerApp {
                             });
                     });
 
-                if ui.button("evolve").clicked() {
-                    self.runtime.block_on(async {
-                        self.loaded_entity.as_mut().unwrap().evolve().await;
-                    });
-                }
+                // if ui.button("evolve").clicked() {
+                //     self.loaded_entity.as_mut().unwrap().evolve();
+                //     // self.runtime.block_on(async {
+                //     // });
+                // }
             }
         });
     }

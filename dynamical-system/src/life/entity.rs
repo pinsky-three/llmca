@@ -3,7 +3,7 @@ use std::{collections::HashSet, fs::read_dir, path::PathBuf, time};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::system::{
-    space::{build_lattice_with_memory, CognitiveSpaceWithMemory},
+    space::{build_lattice_with_memory, load_llm_resolvers_from_env, CognitiveSpaceWithMemory},
     unit_next::CognitiveUnitPair,
 };
 
@@ -15,9 +15,11 @@ pub struct Entity {
     artifacts_folder: PathBuf,
     space: CognitiveSpaceWithMemory,
     step: u32,
+    state: EntityState,
 }
 
-pub enum EntityStatus {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum EntityState {
     ComputingStep(u32),
     Idle,
 }
@@ -51,6 +53,7 @@ impl Entity {
             artifacts_folder,
             space,
             step,
+            state: EntityState::Idle,
         };
 
         ent.save_serialized();
@@ -109,6 +112,7 @@ impl Entity {
             artifacts_folder,
             space,
             step: *last_step,
+            state: EntityState::Idle,
         }
     }
 
@@ -140,10 +144,34 @@ impl Entity {
         unique_states
     }
 
-    pub async fn evolve(&mut self) {
+    pub async fn evolve_async(&mut self) {
         self.space.distributed_step().await;
         self.step += 1;
 
         self.save_serialized();
+    }
+
+    pub fn state(&self) -> &EntityState {
+        &self.state
+    }
+
+    pub fn evolve(&mut self, runtime: &tokio::runtime::Runtime) {
+        self.state = EntityState::ComputingStep(self.step + 1);
+
+        let mut self_clone = self.clone();
+
+        let resolvers = load_llm_resolvers_from_env();
+
+        runtime.spawn(async move {
+            self_clone
+                .space
+                .distributed_step_with_tasks(resolvers)
+                .await;
+            self_clone.step += 1;
+
+            self_clone.save_serialized();
+
+            self_clone.state = EntityState::Idle;
+        });
     }
 }
