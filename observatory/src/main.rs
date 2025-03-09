@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use dotenvy::dotenv;
 use dynamical_system::life::{entity::Entity, manager::LifeManager};
-use eframe::egui::{self, Frame, Sense, Slider, UiBuilder};
+use eframe::egui::{self, CornerRadius, Frame, Margin, Sense, Slider, UiBuilder, Vec2};
 
 fn main() -> eframe::Result {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    dotenv().ok();
+
+    env_logger::init();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1024.0, 1024.0]),
         ..Default::default()
@@ -12,24 +15,32 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "My egui App",
         options,
-        Box::new(|_cc| {
-            // This gives us image support:
-            // egui_extras::install_image_loaders(&cc.egui_ctx);
-
-            Ok(Box::<MyApp>::default())
-        }),
+        Box::new(|_cc| Ok(Box::<LifeManagerApp>::default())),
     )
 }
 
-#[derive(Default)]
-struct MyApp {
+// #[derive(Default)]
+struct LifeManagerApp {
     life_manager: LifeManager,
     selected_entity: usize,
     loaded_entity: Option<Entity>,
     current_step: usize,
+    runtime: tokio::runtime::Runtime,
 }
 
-impl eframe::App for MyApp {
+impl Default for LifeManagerApp {
+    fn default() -> Self {
+        Self {
+            life_manager: LifeManager::default(),
+            selected_entity: 0,
+            loaded_entity: None,
+            current_step: 0,
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+        }
+    }
+}
+
+impl eframe::App for LifeManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -83,8 +94,12 @@ impl eframe::App for MyApp {
                     0..=(entity.current_step() as usize),
                 ));
 
-                egui::Grid::new("some_unique_id")
-                    .spacing([0.0, 0.0])
+                let cell_size = 48.0;
+
+                ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+
+                egui::Grid::new("entity")
+                    .spacing(Vec2::new(0.0, 0.0))
                     .show(ui, |ui| {
                         entity
                             .space_at(self.current_step)
@@ -92,11 +107,11 @@ impl eframe::App for MyApp {
                             .iter()
                             .for_each(|unit| {
                                 let state = &unit.memory.last().unwrap().state;
+                                let rule = &unit.memory.last().unwrap().rule;
 
-                                let (p_y, p_x) = unit.position;
+                                let (p_y, _p_x) = unit.position;
 
                                 if latest_p_y != p_y {
-                                    // println!("change of p_y: {}", p_y);
                                     ui.end_row();
                                 }
 
@@ -104,78 +119,44 @@ impl eframe::App for MyApp {
 
                                 let color = state.clone();
 
-                                let cell_size = (1024.0f32 / 10.0).min(720.0 / 10.0);
-                                // let cell = [p_x as f32 * cell_size, p_y as f32 * cell_size];
-
                                 let response = ui
                                     .scope_builder(
                                         UiBuilder::new()
-                                            .id_salt("interactive_container")
+                                            .id_salt("individual")
                                             .sense(Sense::click() & Sense::hover()),
                                         |ui| {
-                                            let response = ui.response();
-                                            let visuals = ui.style().interact(&response);
-                                            // let text_color = visuals.text_color();
-
                                             Frame::canvas(ui.style())
-                                                // .fill(visuals.bg_fill.gamma_multiply(0.3))
                                                 .fill(
                                                     egui::Color32::from_hex(&color)
                                                         .unwrap_or(egui::Color32::BLACK),
                                                 )
-                                                .stroke(visuals.bg_stroke)
-                                                // .inner_margin(ui.spacing().menu_margin)
+                                                .corner_radius(CornerRadius::ZERO)
+                                                .inner_margin(Margin::ZERO)
+                                                .outer_margin(Margin::ZERO)
                                                 .show(ui, |ui| {
                                                     ui.set_width(cell_size);
                                                     ui.set_height(cell_size);
-
-                                                    // ui.add_space(16.0);
-                                                    // ui.vertical_centered(|ui| {
-                                                    //     Label::new(
-                                                    //         RichText::new(state.to_string())
-                                                    //             .color(text_color)
-                                                    //             .size(16.0),
-                                                    //     )
-                                                    //     .selectable(false)
-                                                    //     .ui(ui);
-                                                    // });
-                                                    // ui.add_space(16.0);
-
-                                                    // ui.vertical(|ui| {
-                                                    // ui.with_layout(
-                                                    //     egui::Layout::bottom_up(egui::Align::Max),
-                                                    //     |ui| {
-                                                    //         if ui.button("update").clicked() {
-                                                    //             // self.count = 0;
-                                                    //         }
-                                                    //     },
-                                                    // );
-                                                    // });
                                                 });
                                         },
                                     )
                                     .response
-                                    .on_hover_text(state.to_string());
+                                    .on_hover_text(format!(
+                                        "pos: {:?}\nstate: {}\nrule: {}",
+                                        unit.position, state, rule,
+                                    ));
 
                                 if response.clicked() {
                                     // self.count += 1;
                                 }
-
-                                // if response.hovered() {
-                                //     ui.label(format!("state: {}", state));
-                                // }
                             });
                     });
-            }
-            // ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-            // if ui.button("Increment").clicked() {
-            //     self.age += 1;
-            // }
-            // ui.label(format!("Hello '{}', age {}", self.name, self.age));
 
-            // ui.image(egui::include_image!(
-            //     "../../../crates/egui/assets/ferris.png"
-            // ));
+                if ui.button("evolve").clicked() {
+                    self.runtime.block_on(async {
+                        self.loaded_entity.as_mut().unwrap().evolve().await;
+                    });
+                }
+            }
         });
     }
 }
