@@ -9,7 +9,7 @@ use crate::system::{
 
 use super::manager::LifeManager;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Entity {
     _id: String,
     artifacts_folder: PathBuf,
@@ -118,6 +118,13 @@ impl Entity {
 
     pub fn space(&self) -> &CognitiveSpaceWithMemory {
         &self.space
+    }
+
+    pub fn space_at(&self, step: usize) -> CognitiveSpaceWithMemory {
+        let json =
+            std::fs::read_to_string(self.artifacts_folder.join(format!("{}.json", step))).unwrap();
+
+        CognitiveSpaceWithMemory::load_from_json(&json)
     }
 
     pub fn calculate_unique_states(&self) -> HashSet<String> {

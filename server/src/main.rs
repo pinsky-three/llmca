@@ -79,7 +79,10 @@ impl Api {
 
         let entity = life_manager.get_mut_entity(&id.0).unwrap();
 
-        entity.space().set_unit(i, j, unit);
+        // entity.space().set_unit(i, j, unit);
+
+        println!("Payload: {:?}", payload);
+        println!("Entity: {:?}", entity);
 
         todo!()
 
