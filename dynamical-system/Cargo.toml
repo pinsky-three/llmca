@@ -6,15 +6,15 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.31"
-itertools = "0.13.0"
-kdam = "0.6.1"
+itertools = "0.14.0"
+kdam = "0.6.2"
 md5 = "0.7.0"
 rand = "0.8.5"
-serde = "1.0.215"
-serde_derive = "1.0.215"
-serde_json = "1.0.133"
-petgraph = { version = "0.6.5", features = ["serde-1"] }
-reqwest = { version = "0.12.9", features = ["blocking", "json"] }
+serde = "1.0.217"
+serde_derive = "1.0.217"
+serde_json = "1.0.137"
+petgraph = { version = "0.7.1", features = ["serde-1"] }
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
 schemars = { version = "0.8.21", features = ["chrono"] }
-tokio = { version = "1.41.1", features = ["full"] }
-chrono = { version = "0.4.38", features = ["serde"] }
+tokio = { version = "1.43.0", features = ["full"] }
+chrono = { version = "0.4.39", features = ["serde"] }

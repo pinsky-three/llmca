@@ -3,7 +3,9 @@ use chrono::Utc;
 use itertools::Itertools;
 use kdam::{tqdm, BarExt};
 use petgraph::{stable_graph::StableGraph, Undirected};
-use rand::{rngs::ThreadRng, seq::SliceRandom, thread_rng};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use rand::{seq::SliceRandom, thread_rng};
 use reqwest::Client;
 
 use serde::{Deserialize, Serialize};
@@ -182,7 +184,8 @@ impl CognitiveSpaceWithMemory {
     pub async fn distributed_step(&mut self) {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
-        let mut rng = ThreadRng::default();
+        // let mut rng = ThreadRng::default();
+        let mut rng = StdRng::from_entropy();
 
         nodes.shuffle(&mut rng);
 

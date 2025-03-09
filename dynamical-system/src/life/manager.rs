@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use super::entity::Entity;
 
+#[derive(Debug)]
 pub struct LifeManager {
     root_folder: PathBuf,
     loaded_entities: Vec<Entity>,
@@ -63,6 +64,12 @@ impl LifeManager {
 
     pub fn get_entity(&self, id: &str) -> Option<&Entity> {
         self.loaded_entities.iter().find(|entity| entity.id() == id)
+    }
+
+    pub fn get_mut_entity(&mut self, id: &str) -> Option<&mut Entity> {
+        self.loaded_entities
+            .iter_mut()
+            .find(|entity| entity.id() == id)
     }
 
     pub fn get_all_entities(&self) -> &Vec<Entity> {
