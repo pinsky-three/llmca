@@ -1,7 +1,6 @@
-use std::{collections::HashSet, fs::read_dir, path::PathBuf, sync::Arc, time};
+use std::{collections::HashSet, fs::read_dir, path::PathBuf, time};
 
 use serde_derive::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 
 use crate::system::{
     space::{build_lattice_with_memory, load_llm_resolvers_from_env, CognitiveSpaceWithMemory},
@@ -121,11 +120,11 @@ impl Entity {
         self.step
     }
 
-    pub fn space(&self) -> &CognitiveSpaceWithMemory {
+    pub fn loaded_space(&self) -> &CognitiveSpaceWithMemory {
         &self.space
     }
 
-    pub fn space_at(&self, step: usize) -> CognitiveSpaceWithMemory {
+    pub fn load_space_at(&self, step: usize) -> CognitiveSpaceWithMemory {
         let json =
             std::fs::read_to_string(self.artifacts_folder.join(format!("{}.json", step))).unwrap();
 
@@ -156,32 +155,39 @@ impl Entity {
         &self.state
     }
 
-    pub fn evolve(&mut self, runtime: &tokio::runtime::Runtime) {
-        // self.state = EntityState::ComputingStep(self.step + 1);
-        let entity_ptr = self.clone().to_owned(); // raw pointer is safe if you guarantee it won't drop
+    pub fn set_state(&mut self, state: EntityState) {
+        self.state = state;
+    }
 
-        let shared_self = Arc::new(Mutex::new(entity_ptr));
+    pub async fn evolve(
+        &mut self,
+        handle: &tokio::runtime::Handle,
+        // self_outside: &mut Arc<Mutex<Self>>,
+    ) {
+        // self.state = EntityState::ComputingStep(self.step + 1);
+        // let entity_ptr = self.clone().to_owned(); // raw pointer is safe if you guarantee it won't drop
+
+        // let shared_self = Arc::new(Mutex::new(entity_ptr));
 
         let resolvers = load_llm_resolvers_from_env();
 
-        let cloned_self = Arc::clone(&shared_self);
+        // let cloned_self = Arc::clone(&shared_self);
 
-        runtime.spawn(async move {
-            cloned_self
-                .lock()
-                .await
-                .to_owned()
-                // .as_ref()
-                // .unwrap()
-                .space
-                .distributed_step_with_tasks(resolvers)
-                .await;
+        println!("d");
+        self.to_owned()
+            // .as_ref()
+            // .unwrap()
+            .space
+            .distributed_step_with_tasks(resolvers, handle)
+            .await;
 
-            let mut self_locked = cloned_self.lock().await;
+        println!("e");
+        // let mut self_locked = self.lock().await;
 
-            self_locked.step += 1;
-            self_locked.save_serialized();
-            self_locked.state = EntityState::Idle;
-        });
+        self.step += 1;
+        self.save_serialized();
+        self.state = EntityState::Idle;
+
+        println!("f");
     }
 }

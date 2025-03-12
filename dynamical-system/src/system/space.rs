@@ -179,7 +179,11 @@ impl CognitiveSpaceWithMemory {
         }
     }
 
-    pub async fn distributed_step_with_tasks(&mut self, resolvers: Vec<LLMResolver>) {
+    pub async fn distributed_step_with_tasks(
+        &mut self,
+        resolvers: Vec<LLMResolver>,
+        handle: &tokio::runtime::Handle,
+    ) {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
         // if self.computing_tasks.is_none() {
@@ -234,7 +238,7 @@ impl CognitiveSpaceWithMemory {
                     total_units: nodes.len(),
                 });
 
-                tasks.push(tokio::spawn(async move {
+                tasks.push(handle.spawn(async move {
                     // unit.calculate_next_state(&ctx, neighbors).await
 
                     unit.calculate_next_complex(&ctx, neighbors).await

@@ -52,7 +52,7 @@ async fn main() {
             states_to_colors.keys().sorted().collect::<Vec<_>>()
         );
 
-        entity.space().get_units().iter().for_each(|unit| {
+        entity.loaded_space().get_units().iter().for_each(|unit| {
             let state = &unit.memory.last().unwrap().state;
 
             let (p_x, p_y) = unit.position;
