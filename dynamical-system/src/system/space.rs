@@ -28,7 +28,7 @@ pub struct CognitiveTask {
 pub struct CognitiveSpaceWithMemory {
     // _rule: Box<R>,
     graph: StableGraph<CognitiveUnitWithMemory, (), Undirected>,
-    computing_tasks: Option<Vec<CognitiveTask>>,
+    // computing_tasks: Option<Vec<CognitiveTask>>,
 }
 
 pub trait CognitiveRule {
@@ -187,8 +187,8 @@ impl CognitiveSpaceWithMemory {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
         // if self.computing_tasks.is_none() {
-        self.computing_tasks = Some(vec![]); // reset at start new distributed step
-                                             // }
+        // self.computing_tasks = Some(vec![]); // reset at start new distributed step
+        // }
 
         // let mut rng = ThreadRng::default();
         let mut rng = StdRng::from_entropy();
@@ -233,10 +233,10 @@ impl CognitiveSpaceWithMemory {
                     secret_key: computation_units[i].2.to_string(),
                 };
 
-                self.computing_tasks.as_mut().unwrap().push(CognitiveTask {
-                    unit: unit.clone(),
-                    total_units: nodes.len(),
-                });
+                // self.computing_tasks.as_mut().unwrap().push(CognitiveTask {
+                //     unit: unit.clone(),
+                //     total_units: nodes.len(),
+                // });
 
                 tasks.push(handle.spawn(async move {
                     // unit.calculate_next_state(&ctx, neighbors).await
@@ -294,13 +294,13 @@ impl CognitiveSpaceWithMemory {
         serde_json::to_string_pretty(&self).unwrap()
     }
 
-    pub fn computing_tasks(&self) -> Vec<CognitiveTask> {
-        if self.computing_tasks.is_none() {
-            return vec![];
-        }
+    // pub fn computing_tasks(&self) -> Vec<CognitiveTask> {
+    //     if self.computing_tasks.is_none() {
+    //         return vec![];
+    //     }
 
-        self.computing_tasks.to_owned().unwrap().clone()
-    }
+    //     self.computing_tasks.to_owned().unwrap().clone()
+    // }
 }
 
 pub fn build_lattice_with_memory(
@@ -397,7 +397,7 @@ pub fn build_lattice_with_memory(
     });
 
     CognitiveSpaceWithMemory {
-        computing_tasks: Option::None,
+        // computing_tasks: Option::None,
         graph,
     }
 }

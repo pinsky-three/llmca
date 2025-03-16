@@ -3,14 +3,20 @@
 use std::sync::Arc;
 
 use dotenvy::dotenv;
-use dynamical_system::life::{
-    entity::{Entity, EntityState},
-    manager::LifeManager,
+use dynamical_system::{
+    life::{
+        entity::{Entity, EntityState},
+        manager::LifeManager,
+    },
+    system::unit_next::CognitiveUnitPair,
 };
 use eframe::egui::{self, CornerRadius, Frame, Margin, Sense, Slider, UiBuilder, Vec2};
-use tokio::sync::Mutex;
+use itertools::Itertools;
+use tokio::sync::oneshot;
 
-fn main() -> eframe::Result {
+
+#[tokio::main]
+async fn main() -> eframe::Result {
     dotenv().ok();
 
     env_logger::init();
@@ -42,46 +48,74 @@ struct LifeManagerApp {
 
 #[derive(Clone)]
 struct ManagedEntity {
-    entity: Arc<tokio::sync::Mutex<Entity>>,
+    entity: Arc<Entity>,
 }
 
 impl ManagedEntity {
     fn state(&self) -> EntityState {
-        self.entity.blocking_lock().state().clone()
+        // self.entity.blocking_lock().state().clone()
+        self.entity.state().to_owned()
     }
 
     fn load_space_at(
         &self,
         step: usize,
     ) -> dynamical_system::system::space::CognitiveSpaceWithMemory {
-        self.entity.blocking_lock().load_space_at(step)
+        self.entity.load_space_at(step)
     }
 
     fn evolve(&mut self, runtime: &tokio::runtime::Runtime) {
         let handle = runtime.handle().clone();
-        let entity = self.entity.clone();
+        let mut entity = self.entity.as_ref().clone();
+
+        let (tx, rx) = oneshot::channel::<bool>();
+
+        println!("1 current entity state: {:?}", self.entity.state());
+
+        entity.set_state(EntityState::ComputingStep(entity.current_step() + 1));
+
 
         runtime.spawn(async move {
             println!("a");
-            let mut locked_entity = entity.lock().await;
+            // let mut locked_entity = entity;
             println!("b");
-            locked_entity.evolve(&handle).await;
+            entity.evolve(&handle, tx).await;
             println!("c");
 
             // done evolving
             // locked_entity.set_state(EntityState::Idle);
+
+            entity.set_state(EntityState::Idle);
         });
+
+        let entity = self.entity.as_ref().clone();
+
+        runtime.spawn(async move {
+            let r = rx.await;
+
+            println!("done evolving: {:?}", r);
+            println!("current entity state: {:?}", entity.state());
+
+
+
+
+
+        });
+
+        // let entity = self.entity.as_ref().clone();
+
+        println!("2 current entity state: {:?}", self.entity.state());
     }
     fn current_step(&self) -> u32 {
-        self.entity.blocking_lock().current_step()
+        self.entity.current_step()
     }
 
-    fn loaded_space(&self) -> dynamical_system::system::space::CognitiveSpaceWithMemory {
-        self.entity.blocking_lock().loaded_space().clone()
-    }
+    // fn loaded_space(&self) -> dynamical_system::system::space::CognitiveSpaceWithMemory {
+    //     self.entity.blocking_lock().loaded_space().clone()
+    // }
 
     fn id(&self) -> String {
-        self.entity.blocking_lock().id().to_string()
+        self.entity.id().to_string()
     }
 }
 
@@ -102,9 +136,30 @@ impl eframe::App for LifeManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Open").clicked() {
-                        // …
+                ui.menu_button("Entities", |ui| {
+                    if ui.button("New").clicked() {
+                        let manager = LifeManager::default();
+
+                        let size = (3, 3);
+    
+                        let initial_state = (0..size.0)
+                            .cartesian_product(0..size.1)
+                            .map(|_p| {
+                                CognitiveUnitPair {
+                                    rule: "you're a pixel in a sunset video, update your state to create an emotive scene"
+                                        .to_string(),
+                                    state: "#bababa".to_string(),
+                                }
+                            })
+                            .collect();
+    
+                        let temporal_memory_size = 4;
+    
+                        let entity =
+                            Entity::new_2d_lattice(&manager, initial_state, size, temporal_memory_size);
+    
+                        println!("entity: {:?}", entity);
+    
                     }
                 });
             });
@@ -112,6 +167,11 @@ impl eframe::App for LifeManagerApp {
             ui.heading("Life Manager");
 
             let entities = self.life_manager.list_entities();
+
+            if entities.is_empty() {
+                ui.label("No entities found");
+                return;
+            }
 
             egui::ComboBox::from_label("Select an organism").show_index(
                 ui,
@@ -121,7 +181,6 @@ impl eframe::App for LifeManagerApp {
             );
 
             ui.horizontal(|ui| {
-                // let name_label = ui.label("Your name: ");
                 // ui.text_edit_singleline(&mut self.name)
                 //     .labelled_by(name_label.id);
                 if ui.button("load").clicked() {
@@ -131,7 +190,7 @@ impl eframe::App for LifeManagerApp {
                         .life_manager
                         .get_entity(&entities[self.selected_entity])
                         .map(|e| ManagedEntity {
-                            entity: Arc::new(Mutex::new(e.clone())),
+                            entity: Arc::new(e.clone()),
                         });
 
                     self.current_step =
@@ -156,25 +215,25 @@ impl eframe::App for LifeManagerApp {
                         ui.label(format!("Computing step {}", step));
 
                         // let tasks = managed_entity.space_at(self.current_step).computing_tasks();
-                        let tasks = managed_entity.loaded_space().computing_tasks();
+                        // let tasks = managed_entity.loaded_space().computing_tasks();
 
-                        println!("len tasks: {}", tasks.len());
+                        // println!("len tasks: {}", tasks.len());
 
                         // let total = tasks.first().unwrap().total_units;
-                        let total = self
-                            .loaded_entity
-                            .as_ref()
-                            .unwrap()
-                            .loaded_space()
-                            .get_units()
-                            .len();
+                        // let total = self
+                        //     .loaded_entity
+                        //     .as_ref()
+                        //     .unwrap()
+                        //     .loaded_space()
+                        //     .get_units()
+                        //     .len();
 
-                        println!("len total: {}", total);
+                        // println!("len total: {}", total);
 
-                        ui.add(
-                            egui::ProgressBar::new(tasks.len() as f32 / total as f32)
-                                .desired_width(100.0),
-                        );
+                        // ui.add(
+                        //     egui::ProgressBar::new(tasks.len() as f32 / total as f32)
+                        //         .desired_width(100.0),
+                        // );
                     }
                 }
             });

@@ -3582,6 +3582,7 @@ dependencies = [
  "dynamical-system",
  "eframe 0.31.1",
  "env_logger",
+ "itertools 0.14.0",
  "tokio",
  "toml",
 ]
