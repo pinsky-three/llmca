@@ -1,7 +1,6 @@
 use std::{collections::HashSet, fs::read_dir, path::PathBuf, time};
 
 use serde_derive::{Deserialize, Serialize};
-use tokio::sync::oneshot::Sender;
 
 use crate::system::{
     space::{build_lattice_with_memory, load_llm_resolvers_from_env, CognitiveSpaceWithMemory},
@@ -163,10 +162,10 @@ impl Entity {
     pub async fn evolve(
         &mut self,
         handle: &tokio::runtime::Handle,
-        tx: Sender<bool>,
+        // tx: Sender<bool>,
         // self_outside: &mut Arc<Mutex<Self>>,
     ) {
-        // self.state = EntityState::ComputingStep(self.step + 1);
+        self.state = EntityState::ComputingStep(self.step + 1);
         // let entity_ptr = self.clone().to_owned(); // raw pointer is safe if you guarantee it won't drop
 
         // let shared_self = Arc::new(Mutex::new(entity_ptr));
@@ -190,7 +189,7 @@ impl Entity {
         self.save_serialized();
         self.state = EntityState::Idle;
 
-        tx.send(true).unwrap();
+        // tx.send(true).unwrap();
 
         println!("f");
     }
