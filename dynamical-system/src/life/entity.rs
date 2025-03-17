@@ -175,10 +175,7 @@ impl Entity {
         // let cloned_self = Arc::clone(&shared_self);
 
         println!("d");
-        self.to_owned()
-            // .as_ref()
-            // .unwrap()
-            .space
+        self.space
             .distributed_step_with_tasks(resolvers, handle)
             .await;
 
