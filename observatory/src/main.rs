@@ -8,7 +8,7 @@ use dynamical_system::{
         entity::{Entity, EntityState},
         manager::LifeManager,
     },
-    system::unit_next::CognitiveUnitPair,
+    system::{space::load_llm_resolvers_from_toml, unit_next::CognitiveUnitPair},
 };
 use eframe::egui::{self, CornerRadius, Frame, Margin, Sense, Slider, UiBuilder, Vec2};
 use itertools::Itertools;
@@ -41,13 +41,19 @@ struct LifeManagerApp {
 
 impl Default for LifeManagerApp {
     fn default() -> Self {
+        let mut manager = LifeManager::default();
+        let resolvers = load_llm_resolvers_from_toml("resolvers.toml");
+
+        println!("resolvers: {:?}", resolvers);
+
+        manager.set_resolvers(resolvers);
+
         Self {
-            life_manager: LifeManager::default(),
+            life_manager: manager,
             selected_entity: 0,
             loaded_entity: None,
             current_step: 0,
             runtime: tokio::runtime::Runtime::new().unwrap(),
-            // worker_state: WorkerState::Idle,
         }
     }
 }
@@ -194,9 +200,10 @@ impl eframe::App for LifeManagerApp {
                     if ui.button("evolve").clicked() {
                         let entity_clone = Arc::clone(managed_entity);
                         let handle = self.runtime.handle().clone();
+                        let resolvers = self.life_manager.resolvers().to_owned();
 
                         self.runtime.spawn(async move {
-                            entity_clone.lock().await.evolve(&handle).await;
+                            entity_clone.lock().await.evolve(&handle, &resolvers).await;
                         });
                     }
 

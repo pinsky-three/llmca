@@ -3,7 +3,7 @@ use std::{collections::HashSet, fs::read_dir, path::PathBuf, time};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::system::{
-    space::{build_lattice_with_memory, load_llm_resolvers_from_env, CognitiveSpaceWithMemory},
+    space::{build_lattice_with_memory, CognitiveSpaceWithMemory, LLMResolver},
     unit_next::CognitiveUnitPair,
 };
 
@@ -162,6 +162,7 @@ impl Entity {
     pub async fn evolve(
         &mut self,
         handle: &tokio::runtime::Handle,
+        resolvers: &[LLMResolver],
         // tx: Sender<bool>,
         // self_outside: &mut Arc<Mutex<Self>>,
     ) {
@@ -170,7 +171,7 @@ impl Entity {
 
         // let shared_self = Arc::new(Mutex::new(entity_ptr));
 
-        let resolvers = load_llm_resolvers_from_env();
+        // let resolvers = load_llm_resolvers_from_env();
 
         // let cloned_self = Arc::clone(&shared_self);
 

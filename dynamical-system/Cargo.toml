@@ -18,3 +18,4 @@ reqwest = { version = "0.12.12", features = ["blocking", "json"] }
 schemars = { version = "0.8.21", features = ["chrono"] }
 tokio = { version = "1.43.0", features = ["full"] }
 chrono = { version = "0.4.39", features = ["serde"] }
+toml = "0.8.20"

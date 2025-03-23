@@ -1,11 +1,14 @@
 use std::path::PathBuf;
 
+use crate::system::space::{load_llm_resolvers_from_env, LLMResolver};
+
 use super::entity::Entity;
 
 #[derive(Debug)]
 pub struct LifeManager {
     root_folder: PathBuf,
     loaded_entities: Vec<Entity>,
+    resolvers: Vec<LLMResolver>,
 }
 
 impl Default for LifeManager {
@@ -19,6 +22,7 @@ impl Default for LifeManager {
         let mut instance = Self {
             root_folder,
             loaded_entities: vec![],
+            resolvers: load_llm_resolvers_from_env(),
         };
 
         instance.list_entities().iter().for_each(|entity_folder| {
@@ -74,5 +78,13 @@ impl LifeManager {
 
     pub fn get_all_entities(&self) -> &Vec<Entity> {
         &self.loaded_entities
+    }
+
+    pub fn resolvers(&self) -> &Vec<LLMResolver> {
+        &self.resolvers
+    }
+
+    pub fn set_resolvers(&mut self, resolvers: Vec<LLMResolver>) {
+        self.resolvers = resolvers;
     }
 }

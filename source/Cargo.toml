@@ -1,0 +1,15 @@
+[package]
+name = "source"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.97"
+candle-core = { version = "0.8.4", features = ["cuda"] }
+candle-examples = { version = "0.8.4", features = ["cuda"] }
+candle-nn = { version = "0.8.4", features = ["cuda"] }
+candle-transformers = { version = "0.8.4", features = ["cuda"] }
+clap = { version = "4.5.32", features = ["derive"] }
+hf-hub = "0.4.2"
+serde_json = "1.0.140"
+tokenizers = "0.21.1"

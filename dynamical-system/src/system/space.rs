@@ -15,7 +15,7 @@ use crate::{
     system::unit::CognitiveContext,
     system::unit_next::{CognitiveUnitComplex, CognitiveUnitPair, CognitiveUnitWithMemory},
 };
-use std::{env, fmt::Debug, vec};
+use std::{env, fmt::Debug, path::Path, vec};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CognitiveTask {
@@ -74,10 +74,11 @@ impl CognitiveRule for MessageModelRule {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMResolver {
-    base_api: String,
+    api_url: String,
+    api_key: String,
     model_name: String,
-    secret_key: String,
 }
 
 impl CognitiveSpaceWithMemory {
@@ -181,7 +182,7 @@ impl CognitiveSpaceWithMemory {
 
     pub async fn distributed_step_with_tasks(
         &mut self,
-        resolvers: Vec<LLMResolver>,
+        resolvers: &[LLMResolver],
         handle: &tokio::runtime::Handle,
     ) {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
@@ -197,13 +198,7 @@ impl CognitiveSpaceWithMemory {
 
         let computation_units: Vec<(String, String, String)> = resolvers
             .iter()
-            .map(|r| {
-                (
-                    r.base_api.clone(),
-                    r.model_name.clone(),
-                    r.secret_key.clone(),
-                )
-            })
+            .map(|r| (r.api_url.clone(), r.model_name.clone(), r.api_key.clone()))
             .collect();
 
         // let mut pb: kdam::Bar = tqdm!(total = nodes.len());
@@ -426,9 +421,22 @@ pub fn load_llm_resolvers_from_env() -> Vec<LLMResolver> {
         .zip(models.iter())
         .zip(secret_keys.iter())
         .map(|((base_api, model_name), secret_key)| LLMResolver {
-            base_api: base_api.to_string(),
+            api_url: base_api.to_string(),
             model_name: model_name.to_string(),
-            secret_key: secret_key.to_string(),
+            api_key: secret_key.to_string(),
         })
         .collect()
+}
+
+pub fn load_llm_resolvers_from_toml<P: AsRef<Path>>(path: P) -> Vec<LLMResolver> {
+    let toml = std::fs::read_to_string(path).unwrap();
+
+    let resolvers: TomlConfig = toml::from_str(&toml).unwrap();
+
+    resolvers.resolvers
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TomlConfig {
+    resolvers: Vec<LLMResolver>,
 }
