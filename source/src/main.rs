@@ -259,27 +259,29 @@ fn main() -> Result<()> {
 
     let api = Api::new()?;
 
-    let model_id = match &args.model_id {
-        Some(model_id) => model_id.to_string(),
-        None => match args.which {
-            Which::InstructV1_1_2B => "google/gemma-1.1-2b-it".to_string(),
-            Which::InstructV1_1_7B => "google/gemma-1.1-7b-it".to_string(),
-            Which::Base2B => "google/gemma-2b".to_string(),
-            Which::Base7B => "google/gemma-7b".to_string(),
-            Which::Instruct2B => "google/gemma-2b-it".to_string(),
-            Which::Instruct7B => "google/gemma-7b-it".to_string(),
-            Which::CodeBase2B => "google/codegemma-2b".to_string(),
-            Which::CodeBase7B => "google/codegemma-7b".to_string(),
-            Which::CodeInstruct2B => "google/codegemma-2b-it".to_string(),
-            Which::CodeInstruct7B => "google/codegemma-7b-it".to_string(),
-            Which::BaseV2_2B => "google/gemma-2-2b".to_string(),
-            Which::InstructV2_2B => "google/gemma-2-2b-it".to_string(),
-            Which::BaseV2_9B => "google/gemma-2-9b".to_string(),
-            Which::InstructV2_9B => "google/gemma-2-9b-it".to_string(),
-            Which::BaseV3_1B => "google/gemma-3-1b-pt".to_string(),
-            Which::InstructV3_1B => "google/gemma-3-1b-it".to_string(),
-        },
-    };
+    // let model_id = match &args.model_id {
+    //     Some(model_id) => model_id.to_string(),
+    //     None => match args.which {
+    //         Which::InstructV1_1_2B => "google/gemma-1.1-2b-it".to_string(),
+    //         Which::InstructV1_1_7B => "google/gemma-1.1-7b-it".to_string(),
+    //         Which::Base2B => "google/gemma-2b".to_string(),
+    //         Which::Base7B => "google/gemma-7b".to_string(),
+    //         Which::Instruct2B => "google/gemma-2b-it".to_string(),
+    //         Which::Instruct7B => "google/gemma-7b-it".to_string(),
+    //         Which::CodeBase2B => "google/codegemma-2b".to_string(),
+    //         Which::CodeBase7B => "google/codegemma-7b".to_string(),
+    //         Which::CodeInstruct2B => "google/codegemma-2b-it".to_string(),
+    //         Which::CodeInstruct7B => "google/codegemma-7b-it".to_string(),
+    //         Which::BaseV2_2B => "google/gemma-2-2b".to_string(),
+    //         Which::InstructV2_2B => "google/gemma-2-2b-it".to_string(),
+    //         Which::BaseV2_9B => "google/gemma-2-9b".to_string(),
+    //         Which::InstructV2_9B => "google/gemma-2-9b-it".to_string(),
+    //         Which::BaseV3_1B => "google/gemma-3-1b-pt".to_string(),
+    //         Which::InstructV3_1B => "google/gemma-3-1b-it".to_string(),
+    //     },
+    // };
+    let model_id = "unsloth/gemma-3-1b-pt-unsloth-bnb-4bit".to_string();
+
     let repo = api.repo(Repo::with_revision(
         model_id,
         RepoType::Model,
@@ -312,13 +314,14 @@ fn main() -> Result<()> {
 
     let device = candle_examples::device(false)?;
 
-    let dtype = if device.is_cuda() {
-        DType::BF16
-    } else {
-        DType::F32
-    };
+    let dtype = DType::F32;
+
+    println!("loading the model on {:?}", device);
+    println!("dtype: {dtype:?}");
 
     let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, dtype, &device)? };
+
+    println!("vb: {:?}", vb.dtype);
 
     let model = match args.which {
         Which::Base2B
@@ -342,7 +345,13 @@ fn main() -> Result<()> {
         }
         Which::BaseV3_1B | Which::InstructV3_1B => {
             let config: Config3 = serde_json::from_reader(std::fs::File::open(config_filename)?)?;
+
+            println!("config: {config:?}");
+
             let model = Model3::new(args.use_flash_attn, &config, vb)?;
+
+            println!("model: {model:?}");
+
             Model::V3(model)
         }
     };
