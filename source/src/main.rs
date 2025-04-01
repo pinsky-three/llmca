@@ -541,7 +541,7 @@ fn main() -> anyhow::Result<()> {
 
     let tokenizer = args.tokenizer()?;
 
-    println!("tokenizer: {:?}", tokenizer);
+    // println!("tokenizer: {:?}", tokenizer);
     println!("tokenizer loaded");
 
     let mut tos = TokenOutputStream::new(tokenizer);

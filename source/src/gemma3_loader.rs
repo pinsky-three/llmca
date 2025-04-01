@@ -32,12 +32,18 @@ struct LayerWeights {
 
 impl LayerWeights {
     fn apply_rotary_emb(&self, x: &Tensor, index_pos: usize) -> Result<Tensor> {
+        // println!("x: {x:?}");
+
         let _enter = self.span_rot.enter();
         let (_b_sz, _n_head, seq_len, _n_embd) = x.dims4()?;
         let cos = self.cos.narrow(0, index_pos, seq_len)?;
         let sin = self.sin.narrow(0, index_pos, seq_len)?;
         // The call to contiguous below is only necessary when processing the prompt.
         // When the seq_len is 1 in the inference loop, this is a no-op.
+
+        // println!("cos: {cos:?}");
+        // println!("sin: {sin:?}");
+
         candle_nn::rotary_emb::rope_i(&x.contiguous()?, &cos, &sin)
     }
 
@@ -54,39 +60,41 @@ impl LayerWeights {
         let k = self.attention_wk.forward(x)?;
         let v = self.attention_wv.forward(x)?;
 
-        println!("q: {q:?}");
-        println!("k: {k:?}");
-        println!("v: {v:?}");
+        // println!("n_embd: {n_embd}");
 
-        println!(
-            "reshape for q: {:?} ",
-            (b_sz, seq_len, self.n_head, self.head_dim)
-        );
+        // println!("q: {q:?}");
+        // println!("k: {k:?}");
+        // println!("v: {v:?}");
+
+        // println!("reshape for q: {:?} ", (b_sz, seq_len, self.n_head, 256));
 
         let q = q
-            .reshape((b_sz, seq_len, self.n_head, self.head_dim))?
+            .reshape((b_sz, seq_len, self.n_head, 256))?
             .transpose(1, 2)?;
 
-        println!("reshaped q: {q:?}");
+        // println!("reshaped q: {q:?}");
 
         let k = k
-            .reshape((b_sz, seq_len, self.n_kv_head, self.head_dim))?
+            .reshape((b_sz, seq_len, self.n_kv_head, 256))?
             .transpose(1, 2)?;
 
-        println!("reshaped k: {k:?}");
+        // println!("reshaped k: {k:?}");
 
         let v = v
-            .reshape((b_sz, seq_len, self.n_kv_head, self.head_dim))?
+            .reshape((b_sz, seq_len, self.n_kv_head, 256))?
             .transpose(1, 2)?
             // This call to contiguous ensures that the fast kernel can be called below. It's
             // actually a no-op except when processing the initial prompt so has no significant
             // impact on performance.
             .contiguous()?;
 
-        println!("reshaped v: {v:?}");
+        // println!("reshaped v: {v:?}");
 
         let q = self.apply_rotary_emb(&q, index_pos)?;
         let k = self.apply_rotary_emb(&k, index_pos)?;
+
+        // println!("reshaped q: {q:?}");
+        // println!("reshaped k: {k:?}");
 
         let (k, v) = match &self.kv_cache {
             None => (k, v),
@@ -101,6 +109,8 @@ impl LayerWeights {
             }
         };
         self.kv_cache = Some((k.clone(), v.clone()));
+
+        // println!("reshaped k cache: {k:?}");
 
         let y = if q.device().is_metal() && seq_len == 1 {
             // SDPA will do MQA for us
@@ -123,8 +133,11 @@ impl LayerWeights {
             att.matmul(&v.contiguous()?)?
         };
 
-        let y = y.transpose(1, 2)?.reshape(&[b_sz, seq_len, n_embd])?;
+        // println!("y: {y:?}");
+
+        let y = y.transpose(1, 2)?.reshape(&[b_sz, seq_len, 1024])?;
         let y = self.attention_wo.forward(&y)?;
+
         Ok(y)
     }
 }
@@ -279,37 +292,37 @@ impl ModelWeightsGemma3 {
             Some(self.mask(seq_len, x.device())?)
         };
 
-        println!("mask: {mask:?}");
+        // println!("mask: {mask:?}");
 
         let _enter = self.span.enter();
         let mut layer_in = self.tok_embeddings.forward(x)?;
 
-        println!("layer_in: {layer_in:?}");
+        // println!("layer_in: {layer_in:?}");
 
         for layer in self.layers.iter_mut() {
             let x = layer_in;
             let residual = &x;
             let x = layer.attention_norm.forward(&x)?;
 
-            println!("x 1: {x:?}");
+            // println!("x 1: {x:?}");
 
             let attn = layer.forward_attn(&x, mask.as_ref(), index_pos)?;
             let x = (attn + residual)?;
 
-            println!("x 2: {x:?}");
+            // println!("x 2: {x:?}");
 
             // MLP
             let _enter = layer.span_mlp.enter();
             let residual = &x;
             let x = layer.ffn_norm.forward(&x)?;
-            println!("x 3: {x:?}");
+            // println!("x 3: {x:?}");
             let x = layer.mlp_or_moe.forward(&x)?;
-            println!("x 4: {x:?}");
+            // println!("x 4: {x:?}");
             let x = (x + residual)?;
             layer_in = x
         }
 
-        println!("layer: {:?}", self.layers);
+        // println!("layer: {:?}", self.layers);
 
         let x = self.norm.forward(&layer_in)?;
         let x = x.i((.., seq_len - 1, ..))?;
@@ -340,7 +353,7 @@ impl ModelWeightsGemma3 {
         let embedding_length = md_get("gemma3.embedding_length")?.to_u32()? as usize;
         // let rope_dim = md_get("gemma3.rope.dimension_count")?.to_u32()? as usize;
 
-        let rope_dim = 1024;
+        let rope_dim = 256;
 
         // Strangely this value is generally 1e-6 in GGUF file but used to be 1e-5 by default.
         let rms_norm_eps = md_get("gemma3.attention.layer_norm_rms_epsilon")?.to_f32()? as f64;
@@ -369,9 +382,9 @@ impl ModelWeightsGemma3 {
             let attention_wk = ct.tensor(reader, &format!("{prefix}.attn_k.weight"), device)?;
             let attention_wv = ct.tensor(reader, &format!("{prefix}.attn_v.weight"), device)?;
 
-            println!("loaded attention_wq: {:?}", attention_wq);
-            println!("loaded attention_wk: {:?}", attention_wk);
-            println!("loaded attention_wv: {:?}", attention_wv);
+            // println!("loaded attention_wq: {:?}", attention_wq);
+            // println!("loaded attention_wk: {:?}", attention_wk);
+            // println!("loaded attention_wv: {:?}", attention_wv);
 
             let attention_wo =
                 ct.tensor(reader, &format!("{prefix}.attn_output.weight"), device)?;
@@ -437,14 +450,14 @@ impl ModelWeightsGemma3 {
             })
         }
 
-        println!("loaded layers: {}", layers.len());
+        // println!("loaded layers: {}", layers.len());
 
         let span = tracing::span!(tracing::Level::TRACE, "model");
         let span_output = tracing::span!(tracing::Level::TRACE, "output");
 
         let tok_embeddings = Embedding::new(tok_embeddings, embedding_length);
 
-        println!("loaded tok_embeddings");
+        // println!("loaded tok_embeddings");
 
         let a = Self {
             tok_embeddings,
@@ -470,7 +483,7 @@ fn precomput_freqs_cis(
         .map(|i| 1f32 / freq_base.powf(i as f32 / head_dim as f32))
         .collect();
 
-    println!("theta: {theta:?}");
+    // println!("theta: {theta:?}");
 
     let theta = Tensor::new(theta.as_slice(), device)?;
     let idx_theta = Tensor::arange(0, MAX_SEQ_LEN as u32, device)?
@@ -480,8 +493,8 @@ fn precomput_freqs_cis(
     let cos = idx_theta.cos()?;
     let sin = idx_theta.sin()?;
 
-    println!("cos: {cos:?}");
-    println!("sin: {sin:?}");
+    // println!("cos: {cos:?}");
+    // println!("sin: {sin:?}");
 
     Ok((cos, sin))
 }
