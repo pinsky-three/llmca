@@ -1,3 +1,13 @@
 [workspace]
-members = ["dynamical-system", "generate-artifacts", "minimal-ui", "observatory", "server", "source"]
+members = [
+    "dynamical-system",
+    "generate-artifacts",
+    "minimal-ui",
+    "observatory",
+    "server",
+    "source",
+]
 resolver = "2"
+
+# [patch.crates-io]
+# log = "0.4.27"
