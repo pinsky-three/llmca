@@ -343,8 +343,8 @@ pub fn build_lattice_with_memory(
         .unzip();
 
     positions.iter().for_each(|&(i, j)| {
-        let i_s1 = i.overflowing_sub(1).1.then(|| n - 1).unwrap_or(i);
-        let j_s1 = j.overflowing_sub(1).1.then(|| m - 1).unwrap_or(j);
+        let i_s1 = if i.overflowing_sub(1).1 { n - 1 } else { i };
+        let j_s1 = if j.overflowing_sub(1).1 { m - 1 } else { j };
 
         let i_a1 = (i + 1) % n;
         let j_a1 = (j + 1) % m;
