@@ -9,4 +9,6 @@ candle-core = { version = "0.8.4", features = ["metal"] }
 candle-transformers = { version = "0.8.4", features = ["metal"] }
 hf-hub = "0.4.2"
 rand = "0.9.1"
+serde = { version = "1.0.219", features = ["derive"] }
+tinytemplate = "1.2.1"
 tokenizers = "0.21.1"

@@ -1,5 +1,5 @@
 use std::{path::PathBuf, thread};
-use swarm::primitives::CognitiveUnit;
+use swarm::primitives::{CognitiveUnit, Context, Message};
 
 fn main() -> anyhow::Result<()> {
     let model_path: PathBuf = "models/models--HuggingFaceTB--SmolLM2-360M-Instruct-GGUF/snapshots/593b5a2e04c8f3e4ee880263f93e0bd2901ad47f/smollm2-360m-instruct-q8_0.gguf".into();
@@ -20,17 +20,16 @@ fn main() -> anyhow::Result<()> {
         .map(|mut unit| {
             // let device_clone = device.clone();
             thread::spawn(move || {
-                unit.generate(
-                    "<|im_start|>system
-You are a helpful assistant.
-<|im_end|>
-<|im_start|>user
-hello
-<|im_end|>
-<|im_start|>assistant
-"
-                    .to_string(),
-                )
+                unit.generate_with_context(Context::from_messages(vec![
+                    Message {
+                        role: "system".to_string(),
+                        content: "You are a helpful assistant.".to_string(),
+                    },
+                    Message {
+                        role: "user".to_string(),
+                        content: "Hello, create me a poem about cantor's theorem?".to_string(),
+                    },
+                ]))
                 .expect("Failed to generate response")
             })
         })

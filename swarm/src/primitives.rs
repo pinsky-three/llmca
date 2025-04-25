@@ -11,6 +11,8 @@ use candle_transformers::{
 };
 use model::ModelWeights;
 use rand::Rng;
+use serde::Serialize;
+// use tinytemplate::TinyTemplate;
 use tokenizers::Tokenizer;
 
 pub struct CognitiveUnit {
@@ -124,7 +126,7 @@ impl CognitiveUnit {
             .encode(prompt_str, true)
             .map_err(anyhow::Error::msg)?;
 
-        let sample_len = 256_usize;
+        let sample_len = 1024_usize;
         // let prompt_tokens = [&pre_prompt_tokens, tokens.get_ids()].concat();
         let prompt_tokens = tokens.get_ids();
         let to_sample = sample_len.saturating_sub(1);
@@ -222,6 +224,14 @@ impl CognitiveUnit {
 
         Ok(String::new())
     }
+
+    pub fn generate_with_context(&mut self, context: Context) -> Result<String> {
+        let prompt = context.compile();
+
+        println!("prompt: {}", prompt);
+
+        self.generate(prompt)
+    }
 }
 
 pub struct TokenOutputStream {
@@ -304,5 +314,49 @@ impl TokenOutputStream {
         self.tokens.clear();
         self.prev_index = 0;
         self.current_index = 0;
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Serialize)]
+pub struct Context {
+    pub messages: Vec<Message>,
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+        }
+    }
+
+    pub fn from_messages(messages: Vec<Message>) -> Self {
+        Self { messages }
+    }
+
+    pub fn add_message(&mut self, message: Message) {
+        self.messages.push(message);
+    }
+
+    pub fn compile(&self) -> String {
+        let mut prompt = String::new();
+        for message in &self.messages {
+            prompt += &format!(
+                "<|im_start|>{}\n{}\n<|im_end|>\n",
+                message.role, message.content
+            );
+        }
+        prompt
+    }
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
     }
 }
