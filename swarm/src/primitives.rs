@@ -228,8 +228,6 @@ impl CognitiveUnit {
     pub fn generate_with_context(&mut self, context: Context) -> Result<String> {
         let prompt = context.compile();
 
-        println!("prompt: {}", prompt);
-
         self.generate(prompt)
     }
 }
