@@ -1,22 +1,18 @@
-// use clap::{Parser, ValueEnum};
+use candle_core::quantized::{ggml_file, gguf_file};
+use candle_core::{Result, Tensor};
+use candle_transformers::generation::{LogitsProcessor, Sampling};
 use rand::Rng;
 use std::io::Write;
 use std::path::PathBuf;
+use swarm::primitives::CognitiveUnit;
 use tokenizers::Tokenizer;
 
-use candle_core::Tensor;
-use candle_core::quantized::{ggml_file, gguf_file};
-use candle_transformers::generation::{LogitsProcessor, Sampling};
-
-// use candle_examples::token_output_stream::TokenOutputStream;
 use candle_transformers::models::quantized_llama as model;
 use model::ModelWeights;
 
 #[derive(Debug)]
 enum Prompt {
-    // Interactive,
     Chat,
-    // One(String),
 }
 
 fn format_size(size_in_bytes: usize) -> String {
@@ -32,111 +28,64 @@ fn format_size(size_in_bytes: usize) -> String {
 }
 
 fn main() -> anyhow::Result<()> {
-    // use tracing_chrome::ChromeLayerBuilder;
-    // use tracing_subscriber::prelude::*;
-
-    // let args = Args::parse();
-
-    // #[cfg(feature = "cuda")]
-    // candle::quantized::cuda::set_force_dmmv(args.force_dmmv);
-
-    // candle_core::cuda::set_gemm_reduced_precision_f16(true);
-    // candle_core::cuda::set_gemm_reduced_precision_bf16(true);
-
-    // let _guard = if args.tracing {
-    //     let (chrome_layer, guard) = ChromeLayerBuilder::new().build();
-    //     tracing_subscriber::registry().with(chrome_layer).init();
-    //     Some(guard)
-    // } else {
-    //     None
-    // };
-
-    // println!(
-    //     "avx: {}, neon: {}, simd128: {}, f16c: {}",
-    //     candle_core::utils::with_avx(),
-    //     candle_core::utils::with_neon(),
-    //     candle_core::utils::with_simd128(),
-    //     candle_core::utils::with_f16c()
-    // );
-    // println!(
-    //     "temp: {:.2} repeat-penalty: {:.2} repeat-last-n: {}",
-    //     args.temperature, args.repeat_penalty, args.repeat_last_n
-    // );
-
     let model_path: PathBuf = "models/models--HuggingFaceTB--SmolLM2-360M-Instruct-GGUF/snapshots/593b5a2e04c8f3e4ee880263f93e0bd2901ad47f/smollm2-360m-instruct-q8_0.gguf".into();
-    let mut file = std::fs::File::open(&model_path)?;
-    let start = std::time::Instant::now();
-    // let device = candle_examples::device(false)?;
+    let tokenizer_path: PathBuf = "models/models--HuggingFaceTB--SmolLM2-360M-Instruct/snapshots/6849e9f43f1a64e4604f0ef9d23adc8af4b4508f/tokenizer.json".into();
+
+    // let mut file = std::fs::File::open(&model_path)?;
+    // let start = std::time::Instant::now();
 
     let device = candle_core::Device::new_metal(0).unwrap();
 
-    let mut model = match model_path.extension().and_then(|v| v.to_str()) {
-        Some("gguf") => {
-            let model = gguf_file::Content::read(&mut file).map_err(|e| e.with_path(model_path))?;
-            let mut total_size_in_bytes = 0;
-            for (_, tensor) in model.tensor_infos.iter() {
-                let elem_count = tensor.shape.elem_count();
-                total_size_in_bytes +=
-                    elem_count * tensor.ggml_dtype.type_size() / tensor.ggml_dtype.block_size();
-            }
-            println!(
-                "loaded {:?} tensors ({}) in {:.2}s",
-                model.tensor_infos.len(),
-                &format_size(total_size_in_bytes),
-                start.elapsed().as_secs_f32(),
-            );
-            ModelWeights::from_gguf(model, &mut file, &device)?
-        }
-        Some("ggml" | "bin") | Some(_) | None => {
-            let model = ggml_file::Content::read(&mut file, &device)
-                .map_err(|e| e.with_path(model_path))?;
-            let mut total_size_in_bytes = 0;
-            for (_, tensor) in model.tensors.iter() {
-                let elem_count = tensor.shape().elem_count();
-                total_size_in_bytes +=
-                    elem_count * tensor.dtype().type_size() / tensor.dtype().block_size();
-            }
-            println!(
-                "loaded {:?} tensors ({}) in {:.2}s",
-                model.tensors.len(),
-                &format_size(total_size_in_bytes),
-                start.elapsed().as_secs_f32(),
-            );
-            println!("params: {:?}", model.hparams);
-            let default_gqa = 1;
+    // let mut model = match model_path.extension().and_then(|v| v.to_str()) {
+    //     Some("gguf") => {
+    //         let model = gguf_file::Content::read(&mut file).map_err(|e| e.with_path(model_path))?;
+    //         let mut total_size_in_bytes = 0;
+    //         for (_, tensor) in model.tensor_infos.iter() {
+    //             let elem_count = tensor.shape.elem_count();
+    //             total_size_in_bytes +=
+    //                 elem_count * tensor.ggml_dtype.type_size() / tensor.ggml_dtype.block_size();
+    //         }
+    //         println!(
+    //             "loaded {:?} tensors ({}) in {:.2}s",
+    //             model.tensor_infos.len(),
+    //             &format_size(total_size_in_bytes),
+    //             start.elapsed().as_secs_f32(),
+    //         );
+    //         ModelWeights::from_gguf(model, &mut file, &device)?
+    //     }
+    //     Some("ggml" | "bin") | Some(_) | None => {
+    //         let model = ggml_file::Content::read(&mut file, &device)
+    //             .map_err(|e| e.with_path(model_path))?;
+    //         let mut total_size_in_bytes = 0;
+    //         for (_, tensor) in model.tensors.iter() {
+    //             let elem_count = tensor.shape().elem_count();
+    //             total_size_in_bytes +=
+    //                 elem_count * tensor.dtype().type_size() / tensor.dtype().block_size();
+    //         }
+    //         println!(
+    //             "loaded {:?} tensors ({}) in {:.2}s",
+    //             model.tensors.len(),
+    //             &format_size(total_size_in_bytes),
+    //             start.elapsed().as_secs_f32(),
+    //         );
+    //         println!("params: {:?}", model.hparams);
+    //         let default_gqa = 1;
 
-            ModelWeights::from_ggml(model, default_gqa)?
-        }
-    };
-    println!("model built");
-
-    // let tokenizer_path = {
-    //     let api = hf_hub::api::sync::Api::new()?;
-    //     let repo = "HuggingFaceTB/SmolLM2-360M-Instruct";
-    //     let api = api.model(repo.to_string());
-    //     // println!("api: {:?}", api);
-    //     api.get("tokenizer.json")?
+    //         ModelWeights::from_ggml(model, default_gqa)?
+    //     }
     // };
 
-    let tokenizer_path: PathBuf = "models/models--HuggingFaceTB--SmolLM2-360M-Instruct/snapshots/6849e9f43f1a64e4604f0ef9d23adc8af4b4508f/tokenizer.json".into();
+    // let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(anyhow::Error::msg)?;
 
-    println!("tokenizer_path: {:?}", tokenizer_path);
+    let mut unit = CognitiveUnit::load_model(&device, model_path, tokenizer_path)?;
 
-    let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(anyhow::Error::msg)?;
-
-    // let tokenizer = args.tokenizer()?;
-    let mut tos = TokenOutputStream::new(tokenizer);
-    // let prompt = match args.prompt.as_deref() {
-    //     Some("chat") => Prompt::Chat,
-    //     Some("interactive") => Prompt::Interactive,
-    //     Some(s) => Prompt::One(s.to_string()),
-    //     None => Prompt::One(DEFAULT_PROMPT.to_string()),
-    // };
+    let mut tos = TokenOutputStream::new(unit.tokenizer);
 
     let prompt = Prompt::Chat; //("tell me a joke".to_string());
 
     let mut pre_prompt_tokens = vec![];
-    for prompt_index in 0.. {
+
+    for _ in 0.. {
         let prompt_str = match &prompt {
             // Prompt::One(prompt) => prompt.clone(),
             Prompt::Chat => {
@@ -151,21 +100,7 @@ fn main() -> anyhow::Result<()> {
                         prompt.pop();
                     }
                 }
-                // if args.which.is_open_chat() {
-                //     format!("GPT4 Correct User: {prompt}<|end_of_turn|>GPT4 Correct Assistant:")
-                // } else if args.which.is_zephyr() {
-                //     if prompt_index == 0 || is_interactive {
-                //         format!("<|system|>\n</s>\n<|user|>\n{prompt}</s>\n<|assistant|>",)
-                //     } else {
-                //         format!("<|user|>\n{prompt}</s>\n<|assistant|>")
-                //     }
-                // } else if args.which.is_mistral() {
-                //     format!("[INST] {prompt} [/INST]")
-                // } else if args.which.is_deepseek() {
-                //     format!("<｜User｜>{prompt}<｜Assistant｜>")
-                // } else {
-                //     prompt
-                // }
+
                 prompt
             }
         };
@@ -174,12 +109,6 @@ fn main() -> anyhow::Result<()> {
             .tokenizer()
             .encode(prompt_str, true)
             .map_err(anyhow::Error::msg)?;
-        // if args.verbose_prompt {
-        //     for (token, id) in tokens.get_tokens().iter().zip(tokens.get_ids().iter()) {
-        //         let token = token.replace('▁', " ").replace("<0x0A>", "\n");
-        //         println!("{id:7} -> '{token}'");
-        //     }
-        // }
 
         let sample_len = 512usize;
         let prompt_tokens = [&pre_prompt_tokens, tokens.get_ids()].concat();
@@ -199,36 +128,16 @@ fn main() -> anyhow::Result<()> {
             let sampling = if temperature <= 0. {
                 Sampling::ArgMax
             } else {
-                // match (args.top_k, args.top_p) {
-                //     (None, None) => Sampling::All { temperature },
-                //     (Some(k), None) => Sampling::TopK { k, temperature },
-                //     (None, Some(p)) => Sampling::TopP { p, temperature },
-                //     (Some(k), Some(p)) => Sampling::TopKThenTopP { k, p, temperature },
-                // }
                 Sampling::All { temperature }
             };
             LogitsProcessor::from_sampling(rng.random::<u64>(), sampling)
         };
 
         let start_prompt_processing = std::time::Instant::now();
-        // let mut next_token = if !args.split_prompt {
-        //     let input = Tensor::new(prompt_tokens.as_slice(), &device)?.unsqueeze(0)?;
-        //     let logits = model.forward(&input, 0)?;
-        //     let logits = logits.squeeze(0)?;
-        //     logits_processor.sample(&logits)?
-        // } else {
-        //     let mut next_token = 0;
-        //     for (pos, token) in prompt_tokens.iter().enumerate() {
-        //         let input = Tensor::new(&[*token], &device)?.unsqueeze(0)?;
-        //         let logits = model.forward(&input, pos)?;
-        //         let logits = logits.squeeze(0)?;
-        //         next_token = logits_processor.sample(&logits)?
-        //     }
-        //     next_token
-        // };
+
         let mut next_token = {
             let input = Tensor::new(prompt_tokens.as_slice(), &device)?.unsqueeze(0)?;
-            let logits = model.forward(&input, 0)?;
+            let logits = unit.model.forward(&input, 0)?;
             let logits = logits.squeeze(0)?;
             logits_processor.sample(&logits)?
         };
@@ -251,7 +160,7 @@ fn main() -> anyhow::Result<()> {
         let mut sampled = 0;
         for index in 0..to_sample {
             let input = Tensor::new(&[next_token], &device)?.unsqueeze(0)?;
-            let logits = model.forward(&input, prompt_tokens.len() + index)?;
+            let logits = unit.model.forward(&input, prompt_tokens.len() + index)?;
             let logits = logits.squeeze(0)?;
             let logits = if repeat_penalty == 1. {
                 logits
@@ -290,8 +199,6 @@ fn main() -> anyhow::Result<()> {
         );
 
         match prompt {
-            // Prompt::One(_) => break,
-            // Prompt::Interactive => {}
             Prompt::Chat => {
                 pre_prompt_tokens = [prompt_tokens.as_slice(), all_tokens.as_slice()].concat()
             }
@@ -301,10 +208,6 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-use candle_core::Result;
-
-/// This is a wrapper around a tokenizer to ensure that tokens can be returned to the user in a
-/// streaming way rather than having to wait for the full decoding.
 pub struct TokenOutputStream {
     tokenizer: tokenizers::Tokenizer,
     tokens: Vec<u32>,
