@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut units = vec![];
 
-    let n = 1;
+    let n = 25;
 
     for _ in 0..n {
         let device = candle_core::Device::new_metal(0).unwrap();
@@ -20,23 +20,27 @@ fn main() -> anyhow::Result<()> {
         .map(|mut unit| {
             // let device_clone = device.clone();
             thread::spawn(move || {
-                unit.generate_with_context(Context::from_messages(vec![
-                    Message {
-                        role: "system".to_string(),
-                        content: "You are a helpful assistant.".to_string(),
-                    },
-                    Message {
-                        role: "user".to_string(),
-                        content: "Hello, create me a poem about cantor's theorem?".to_string(),
-                    },
-                ]))
-                .expect("Failed to generate response")
+                let result = unit
+                    .generate_with_context(Context::from_messages(vec![
+                        Message {
+                            role: "system".to_string(),
+                            content: "You only answer in hex rgb code".to_string(),
+                        },
+                        Message {
+                            role: "user".to_string(),
+                            content: "which is your favorite color, give me the #rgb code?"
+                                .to_string(),
+                        },
+                    ]))
+                    .expect("Failed to generate response");
+
+                println!("{}", result.content);
             })
         })
         .collect::<Vec<_>>();
 
     for handle in handles {
-        let _result = handle.join().expect("Thread panicked");
+        handle.join().expect("Thread panicked");
         // println!("{}", result);
     }
 

@@ -140,6 +140,8 @@ impl CognitiveUnit {
         let mut rng = rand::rng();
 
         let mut all_tokens = vec![];
+        let mut all_tokens_str = String::new();
+
         let mut logits_processor = {
             let temperature = 0.2;
             let sampling = if temperature <= 0. {
@@ -167,7 +169,8 @@ impl CognitiveUnit {
 
         all_tokens.push(next_token);
         if let Some(t) = tos.next_token(next_token)? {
-            print!("{t}");
+            // print!("{t}");
+            all_tokens_str.push_str(&t);
             std::io::stdout().flush()?;
         }
 
@@ -196,7 +199,8 @@ impl CognitiveUnit {
             next_token = logits_processor.sample(&logits)?;
             all_tokens.push(next_token);
             if let Some(t) = tos.next_token(next_token)? {
-                print!("{t}");
+                // print!("{t}");
+                all_tokens_str.push_str(&t);
                 std::io::stdout().flush()?;
             }
             sampled += 1;
@@ -205,7 +209,8 @@ impl CognitiveUnit {
             };
         }
         if let Some(rest) = tos.decode_rest().map_err(candle_core::Error::msg)? {
-            print!("{rest}");
+            // print!("{rest}");
+            all_tokens_str.push_str(&rest);
         }
 
         std::io::stdout().flush()?;
@@ -222,13 +227,15 @@ impl CognitiveUnit {
 
         let _ = [prompt_tokens.as_slice(), all_tokens.as_slice()].concat();
 
-        Ok(String::new())
+        Ok(all_tokens_str)
     }
 
-    pub fn generate_with_context(&mut self, context: Context) -> Result<String> {
+    pub fn generate_with_context(&mut self, context: Context) -> Result<Message> {
         let prompt = context.compile();
 
-        self.generate(prompt)
+        let message = self.generate(prompt)?;
+
+        Ok(Message::from_string(message))
     }
 }
 
@@ -321,6 +328,53 @@ pub struct Message {
     pub content: String,
 }
 
+impl Message {
+    pub fn new(role: String, content: String) -> Self {
+        Self { role, content }
+    }
+
+    pub fn from_string(s: String) -> Self {
+        let parts = s.splitn(2, '\n').collect::<Vec<&str>>();
+        if parts.len() == 2 {
+            let mut role = parts[0].trim().to_string();
+            // Remove <|im_start|> prefix from role if present
+            if role.starts_with("<|im_start|>") {
+                role = role.trim_start_matches("<|im_start|>").trim().to_string();
+            }
+
+            let mut content = parts[1].trim().to_string();
+            // Remove trailing <|im_end|> if present
+            if content.ends_with("<|im_end|>") {
+                content.truncate(content.len() - "<|im_end|>".len());
+                content = content.trim_end().to_string(); // Trim potential whitespace before the tag
+            }
+            Self { role, content }
+        } else {
+            // If split fails, assume the whole string is content and clean it
+            let mut content = s.trim().to_string();
+            if content.ends_with("<|im_end|>") {
+                content.truncate(content.len() - "<|im_end|>".len());
+                content = content.trim_end().to_string();
+            }
+            // Assign a default role since we couldn't parse one
+            // Also check for <|im_start|> prefix here just in case, though unlikely
+            let mut role = "unknown".to_string();
+            if s.trim().starts_with("<|im_start|>") {
+                // Attempt to extract role if possible, might indicate malformed input
+                if let Some(newline_pos) = s.trim().find('\n') {
+                    let potential_role = s.trim()[..newline_pos]
+                        .trim_start_matches("<|im_start|>")
+                        .trim();
+                    if !potential_role.is_empty() {
+                        role = potential_role.to_string();
+                    }
+                }
+            }
+            Self { role, content }
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct Context {
     pub messages: Vec<Message>,
@@ -351,6 +405,29 @@ impl Context {
         }
         prompt
     }
+
+    // New function to parse the output
+    // pub fn parse_output_to_messages(output: &str) -> Vec<Message> {
+    //     let mut messages = Vec::new();
+    //     let parts = output.split("<|im_start|>");
+
+    //     for part in parts {
+    //         let trimmed_part = part.trim();
+    //         if trimmed_part.is_empty() {
+    //             continue;
+    //         }
+
+    //         if let Some(end_pos) = trimmed_part.find("<|im_end|>") {
+    //             let content_part = &trimmed_part[..end_pos].trim();
+    //             if let Some(newline_pos) = content_part.find('\n') {
+    //                 let role = content_part[..newline_pos].trim().to_string();
+    //                 let content = content_part[newline_pos + 1..].trim().to_string();
+    //                 messages.push(Message { role, content });
+    //             }
+    //         }
+    //     }
+    //     messages
+    // }
 }
 
 impl Default for Context {
