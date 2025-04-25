@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut units = vec![];
 
-    let n = 25;
+    let n = 9;
 
     for _ in 0..n {
         let device = candle_core::Device::new_metal(0).unwrap();
@@ -18,23 +18,36 @@ fn main() -> anyhow::Result<()> {
     let handles = units
         .into_iter()
         .map(|mut unit| {
-            // let device_clone = device.clone();
             thread::spawn(move || {
-                let result = unit
-                    .generate_with_context(Context::from_messages(vec![
-                        Message {
-                            role: "system".to_string(),
-                            content: "You only answer in hex rgb code".to_string(),
-                        },
-                        Message {
-                            role: "user".to_string(),
-                            content: "which is your favorite color, give me the #rgb code?"
-                                .to_string(),
-                        },
-                    ]))
-                    .expect("Failed to generate response");
+                let mut context = Context::from_messages(vec![
+                    Message {
+                        role: "system".to_string(),
+                        content: "You only answer in hex rgb code".to_string(),
+                    },
+                    Message {
+                        role: "user".to_string(),
+                        content: "you're a pixel in a sunset photo, give me the #rrggbb code"
+                            .to_string(),
+                    },
+                ]);
 
-                println!("{}", result.content);
+                for _ in 0.. {
+                    // Let's do 3 turns of conversation
+                    let result = unit
+                        .generate_with_context(&context)
+                        .expect("Failed to generate response");
+
+                    context.add_message(result);
+
+                    // println!("{}", result.content);
+                    println!("{:?}", context.messages.last().unwrap().content);
+
+                    // Add a follow-up user message to continue the conversation
+                    context.add_message(Message {
+                        role: "user".to_string(),
+                        content: "Give me a slightly different color".to_string(),
+                    });
+                }
             })
         })
         .collect::<Vec<_>>();
@@ -44,7 +57,7 @@ fn main() -> anyhow::Result<()> {
         // println!("{}", result);
     }
 
-    thread::sleep(std::time::Duration::from_secs(10));
+    // thread::sleep(std::time::Duration::from_secs(10));
 
     Ok(())
 }

@@ -156,7 +156,7 @@ impl CognitiveUnit {
             LogitsProcessor::from_sampling(rng.random::<u64>(), sampling)
         };
 
-        let start_prompt_processing = std::time::Instant::now();
+        // let start_prompt_processing = std::time::Instant::now();
 
         let mut next_token = {
             let input = Tensor::new(prompt_tokens.as_slice(), &self.device)?.unsqueeze(0)?;
@@ -165,7 +165,7 @@ impl CognitiveUnit {
             logits_processor.sample(&logits)?
         };
 
-        let prompt_dt = start_prompt_processing.elapsed();
+        // let prompt_dt = start_prompt_processing.elapsed();
 
         all_tokens.push(next_token);
         if let Some(t) = tos.next_token(next_token)? {
@@ -180,8 +180,8 @@ impl CognitiveUnit {
         let repeat_last_n = 64;
 
         let eos_token = *tos.tokenizer().get_vocab(true).get(eos_token).unwrap();
-        let start_post_prompt = std::time::Instant::now();
-        let mut sampled = 0;
+        // let start_post_prompt = std::time::Instant::now();
+        // let mut sampled = 0;
         for index in 0..to_sample {
             let input = Tensor::new(&[next_token], &self.device)?.unsqueeze(0)?;
             let logits = self.model.forward(&input, prompt_tokens.len() + index)?;
@@ -203,7 +203,7 @@ impl CognitiveUnit {
                 all_tokens_str.push_str(&t);
                 std::io::stdout().flush()?;
             }
-            sampled += 1;
+            // sampled += 1;
             if next_token == eos_token {
                 break;
             };
@@ -214,23 +214,23 @@ impl CognitiveUnit {
         }
 
         std::io::stdout().flush()?;
-        let dt = start_post_prompt.elapsed();
-        println!(
-            "\n\n{:4} prompt tokens processed: {:.2} token/s",
-            prompt_tokens.len(),
-            prompt_tokens.len() as f64 / prompt_dt.as_secs_f64(),
-        );
-        println!(
-            "{sampled:4} tokens generated: {:.2} token/s",
-            sampled as f64 / dt.as_secs_f64(),
-        );
+        // let dt = start_post_prompt.elapsed();
+        // println!(
+        //     "\n\n{:4} prompt tokens processed: {:.2} token/s",
+        //     prompt_tokens.len(),
+        //     prompt_tokens.len() as f64 / prompt_dt.as_secs_f64(),
+        // );
+        // println!(
+        //     "{sampled:4} tokens generated: {:.2} token/s",
+        //     sampled as f64 / dt.as_secs_f64(),
+        // );
 
         let _ = [prompt_tokens.as_slice(), all_tokens.as_slice()].concat();
 
         Ok(all_tokens_str)
     }
 
-    pub fn generate_with_context(&mut self, context: Context) -> Result<Message> {
+    pub fn generate_with_context(&mut self, context: &Context) -> Result<Message> {
         let prompt = context.compile();
 
         let message = self.generate(prompt)?;
@@ -375,24 +375,36 @@ impl Message {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Context {
+    size: usize,
     pub messages: Vec<Message>,
 }
 
 impl Context {
-    pub fn new() -> Self {
+    pub fn new(size: usize) -> Self {
         Self {
+            size,
             messages: Vec::new(),
         }
     }
 
     pub fn from_messages(messages: Vec<Message>) -> Self {
-        Self { messages }
+        Self {
+            size: messages.len() * 2,
+            messages,
+        }
     }
 
     pub fn add_message(&mut self, message: Message) {
-        self.messages.push(message);
+        if (self.messages.len() - 1) > self.size {
+            self.messages
+                .drain(2..self.size)
+                .collect::<Vec<_>>()
+                .push(message);
+        } else {
+            self.messages.push(message);
+        }
     }
 
     pub fn compile(&self) -> String {
@@ -432,6 +444,6 @@ impl Context {
 
 impl Default for Context {
     fn default() -> Self {
-        Self::new()
+        Self::new(10)
     }
 }
