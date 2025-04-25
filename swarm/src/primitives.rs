@@ -15,6 +15,7 @@ use tokenizers::Tokenizer;
 
 pub struct CognitiveUnit {
     _id: String,
+    pub device: Device,
     pub model: ModelWeights,
     pub tokenizer: Tokenizer,
 }
@@ -33,7 +34,7 @@ fn format_size(size_in_bytes: usize) -> String {
 
 impl CognitiveUnit {
     pub fn load_model(
-        device: &Device,
+        device: Device,
         model_path: PathBuf,
         tokenizer_path: PathBuf,
     ) -> Result<Self> {
@@ -56,10 +57,10 @@ impl CognitiveUnit {
                     &format_size(total_size_in_bytes),
                     start.elapsed().as_secs_f32(),
                 );
-                ModelWeights::from_gguf(model, &mut file, device)?
+                ModelWeights::from_gguf(model, &mut file, &device)?
             }
             Some("ggml" | "bin") | Some(_) | None => {
-                let model = ggml_file::Content::read(&mut file, device)
+                let model = ggml_file::Content::read(&mut file, &device)
                     .map_err(|e| e.with_path(model_path))?;
                 let mut total_size_in_bytes = 0;
                 for (_, tensor) in model.tensors.iter() {
@@ -86,9 +87,10 @@ impl CognitiveUnit {
             _id: "".to_string(),
             model,
             tokenizer,
+            device,
         })
     }
-    pub fn generate(&mut self, device: &Device, prompt: String) -> Result<String> {
+    pub fn generate(&mut self, prompt: String) -> Result<String> {
         let mut tos = TokenOutputStream::new(self.tokenizer.clone());
 
         // let prompt = Prompt::Chat; //("tell me a joke".to_string());
@@ -115,14 +117,14 @@ impl CognitiveUnit {
         // };
         let prompt_str = prompt;
 
-        print!("{}", prompt_str);
+        // print!("{}", prompt_str);
 
         let tokens = tos
             .tokenizer()
             .encode(prompt_str, true)
             .map_err(anyhow::Error::msg)?;
 
-        let sample_len = 512usize;
+        let sample_len = 256_usize;
         // let prompt_tokens = [&pre_prompt_tokens, tokens.get_ids()].concat();
         let prompt_tokens = tokens.get_ids();
         let to_sample = sample_len.saturating_sub(1);
@@ -149,7 +151,7 @@ impl CognitiveUnit {
         let start_prompt_processing = std::time::Instant::now();
 
         let mut next_token = {
-            let input = Tensor::new(prompt_tokens.as_slice(), device)?.unsqueeze(0)?;
+            let input = Tensor::new(prompt_tokens.as_slice(), &self.device)?.unsqueeze(0)?;
             let logits = self.model.forward(&input, 0)?;
             let logits = logits.squeeze(0)?;
             logits_processor.sample(&logits)?
@@ -158,8 +160,8 @@ impl CognitiveUnit {
         let prompt_dt = start_prompt_processing.elapsed();
 
         all_tokens.push(next_token);
-        if let Some(t) = tos.next_token(next_token)? {
-            print!("{t}");
+        if let Some(_t) = tos.next_token(next_token)? {
+            // print!("{t}");
             std::io::stdout().flush()?;
         }
 
@@ -172,7 +174,7 @@ impl CognitiveUnit {
         let start_post_prompt = std::time::Instant::now();
         let mut sampled = 0;
         for index in 0..to_sample {
-            let input = Tensor::new(&[next_token], device)?.unsqueeze(0)?;
+            let input = Tensor::new(&[next_token], &self.device)?.unsqueeze(0)?;
             let logits = self.model.forward(&input, prompt_tokens.len() + index)?;
             let logits = logits.squeeze(0)?;
             let logits = if repeat_penalty == 1. {
@@ -187,8 +189,8 @@ impl CognitiveUnit {
             };
             next_token = logits_processor.sample(&logits)?;
             all_tokens.push(next_token);
-            if let Some(t) = tos.next_token(next_token)? {
-                print!("{t}");
+            if let Some(_t) = tos.next_token(next_token)? {
+                // print!("{t}");
                 std::io::stdout().flush()?;
             }
             sampled += 1;
@@ -196,8 +198,8 @@ impl CognitiveUnit {
                 break;
             };
         }
-        if let Some(rest) = tos.decode_rest().map_err(candle_core::Error::msg)? {
-            print!("{rest}");
+        if let Some(_rest) = tos.decode_rest().map_err(candle_core::Error::msg)? {
+            // print!("{rest}");
         }
         std::io::stdout().flush()?;
         let dt = start_post_prompt.elapsed();
