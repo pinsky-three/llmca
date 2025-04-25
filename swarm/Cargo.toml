@@ -1,0 +1,12 @@
+[package]
+name = "swarm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+candle-core = { version = "0.8.4", features = ["metal"] }
+candle-transformers = { version = "0.8.4", features = ["metal"] }
+hf-hub = "0.4.2"
+rand = "0.9.1"
+tokenizers = "0.21.1"
