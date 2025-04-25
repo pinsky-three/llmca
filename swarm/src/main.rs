@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut units = vec![];
 
-    let n = 4;
+    let n = 1;
 
     for _ in 0..n {
         let device = candle_core::Device::new_metal(0).unwrap();
@@ -20,8 +20,18 @@ fn main() -> anyhow::Result<()> {
         .map(|mut unit| {
             // let device_clone = device.clone();
             thread::spawn(move || {
-                unit.generate("Hello, how are you?".to_string())
-                    .expect("Failed to generate response")
+                unit.generate(
+                    "<|im_start|>system
+You are a helpful assistant.
+<|im_end|>
+<|im_start|>user
+hello
+<|im_end|>
+<|im_start|>assistant
+"
+                    .to_string(),
+                )
+                .expect("Failed to generate response")
             })
         })
         .collect::<Vec<_>>();
@@ -31,7 +41,7 @@ fn main() -> anyhow::Result<()> {
         // println!("{}", result);
     }
 
-    thread::sleep(std::time::Duration::from_secs(60));
+    thread::sleep(std::time::Duration::from_secs(10));
 
     Ok(())
 }

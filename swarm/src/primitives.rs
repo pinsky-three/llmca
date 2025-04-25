@@ -139,11 +139,15 @@ impl CognitiveUnit {
 
         let mut all_tokens = vec![];
         let mut logits_processor = {
-            let temperature = 0.7;
+            let temperature = 0.2;
             let sampling = if temperature <= 0. {
                 Sampling::ArgMax
             } else {
-                Sampling::All { temperature }
+                // Sampling::All { temperature }
+                Sampling::TopP {
+                    p: 0.9,
+                    temperature,
+                }
             };
             LogitsProcessor::from_sampling(rng.random::<u64>(), sampling)
         };
@@ -160,12 +164,12 @@ impl CognitiveUnit {
         let prompt_dt = start_prompt_processing.elapsed();
 
         all_tokens.push(next_token);
-        if let Some(_t) = tos.next_token(next_token)? {
-            // print!("{t}");
+        if let Some(t) = tos.next_token(next_token)? {
+            print!("{t}");
             std::io::stdout().flush()?;
         }
 
-        let eos_token = "<|endoftext|>";
+        let eos_token = "<|im_end|>";
 
         let repeat_penalty = 1.1;
         let repeat_last_n = 64;
@@ -189,8 +193,8 @@ impl CognitiveUnit {
             };
             next_token = logits_processor.sample(&logits)?;
             all_tokens.push(next_token);
-            if let Some(_t) = tos.next_token(next_token)? {
-                // print!("{t}");
+            if let Some(t) = tos.next_token(next_token)? {
+                print!("{t}");
                 std::io::stdout().flush()?;
             }
             sampled += 1;
@@ -198,9 +202,10 @@ impl CognitiveUnit {
                 break;
             };
         }
-        if let Some(_rest) = tos.decode_rest().map_err(candle_core::Error::msg)? {
-            // print!("{rest}");
+        if let Some(rest) = tos.decode_rest().map_err(candle_core::Error::msg)? {
+            print!("{rest}");
         }
+
         std::io::stdout().flush()?;
         let dt = start_post_prompt.elapsed();
         println!(
@@ -241,7 +246,7 @@ impl TokenOutputStream {
     }
 
     fn decode(&self, tokens: &[u32]) -> candle_core::Result<String> {
-        match self.tokenizer.decode(tokens, true) {
+        match self.tokenizer.decode(tokens, false) {
             Ok(str) => Ok(str),
             Err(err) => candle_core::bail!("cannot decode: {err}"),
         }
