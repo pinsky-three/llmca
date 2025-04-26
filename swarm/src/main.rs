@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut units = vec![];
 
-    let n = 9;
+    let n = 1;
 
     for _ in 0..n {
         let device = candle_core::Device::new_metal(0).unwrap();
@@ -19,17 +19,19 @@ fn main() -> anyhow::Result<()> {
         .into_iter()
         .map(|mut unit| {
             thread::spawn(move || {
-                let mut context = Context::from_messages(vec![
+                let mut context = Context::new(
+                    10,
                     Message {
                         role: "system".to_string(),
                         content: "You only answer in hex rgb code".to_string(),
                     },
-                    Message {
-                        role: "user".to_string(),
-                        content: "you're a pixel in a sunset photo, give me the #rrggbb code"
-                            .to_string(),
-                    },
-                ]);
+                );
+
+                context.push_message(Message {
+                    role: "user".to_string(),
+                    content: "you're a pixel in a sunset photo, give me the #rrggbb code"
+                        .to_string(),
+                });
 
                 for _ in 0.. {
                     // Let's do 3 turns of conversation
@@ -37,15 +39,23 @@ fn main() -> anyhow::Result<()> {
                         .generate_with_context(&context)
                         .expect("Failed to generate response");
 
-                    context.add_message(result);
+                    context.push_message(result);
 
                     // println!("{}", result.content);
-                    println!("{:?}", context.messages.last().unwrap().content);
+                    // println!("{:?}", context.messages.last().unwrap().content);
+
+                    for msg in context.messages() {
+                        println!("{:?}: {}", msg.role, msg.content);
+                    }
+
+                    println!("--------------------------------");
 
                     // Add a follow-up user message to continue the conversation
-                    context.add_message(Message {
+                    context.push_message(Message {
                         role: "user".to_string(),
-                        content: "Give me a slightly different color".to_string(),
+                        content:
+                            "Give me a slightly different color (remember only a rgb hex string)"
+                                .to_string(),
                     });
                 }
             })

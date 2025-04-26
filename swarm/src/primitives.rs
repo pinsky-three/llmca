@@ -232,6 +232,7 @@ impl CognitiveUnit {
 
     pub fn generate_with_context(&mut self, context: &Context) -> Result<Message> {
         let prompt = context.compile();
+        // println!("prompt: {}", prompt);
 
         let message = self.generate(prompt)?;
 
@@ -322,7 +323,7 @@ impl TokenOutputStream {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
@@ -378,37 +379,45 @@ impl Message {
 #[derive(Debug, Serialize)]
 pub struct Context {
     size: usize,
-    pub messages: Vec<Message>,
+    system_message: Message,
+    messages: Vec<Message>,
 }
 
 impl Context {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, system_message: Message) -> Self {
         Self {
             size,
+            system_message,
             messages: Vec::new(),
         }
     }
 
-    pub fn from_messages(messages: Vec<Message>) -> Self {
+    pub fn from_messages(system_message: Message, messages: Vec<Message>) -> Self {
         Self {
             size: messages.len() * 2,
+            system_message,
             messages,
         }
     }
 
-    pub fn add_message(&mut self, message: Message) {
-        if (self.messages.len() - 1) > self.size {
-            self.messages
-                .drain(2..self.size)
-                .collect::<Vec<_>>()
-                .push(message);
-        } else {
-            self.messages.push(message);
+    pub fn push_message(&mut self, message: Message) {
+        if self.messages.len() > self.size {
+            self.messages.remove(0);
         }
+
+        self.messages.push(message);
     }
 
     pub fn compile(&self) -> String {
         let mut prompt = String::new();
+
+        // First add the system message
+        prompt += &format!(
+            "<|im_start|>{}\n{}\n<|im_end|>\n",
+            self.system_message.role, self.system_message.content
+        );
+
+        // Then add the rest of the messages
         for message in &self.messages {
             prompt += &format!(
                 "<|im_start|>{}\n{}\n<|im_end|>\n",
@@ -416,6 +425,12 @@ impl Context {
             );
         }
         prompt
+    }
+
+    pub fn messages(&self) -> Vec<Message> {
+        let mut messages = vec![self.system_message.clone()];
+        messages.extend(self.messages.clone());
+        messages
     }
 
     // New function to parse the output
@@ -444,6 +459,12 @@ impl Context {
 
 impl Default for Context {
     fn default() -> Self {
-        Self::new(10)
+        Self::new(
+            10,
+            Message {
+                role: "system".to_string(),
+                content: "You're a helpful assistant".to_string(),
+            },
+        )
     }
 }
