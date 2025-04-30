@@ -1,5 +1,19 @@
+use schemars::{JsonSchema, schema_for};
+use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, thread};
 use swarm::primitives::{CognitiveUnit, Context, Message};
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CognitiveUnitPair {
+    pub rule: String,
+    pub state: String,
+}
+
+impl CognitiveUnitPair {
+    pub fn self_description() -> String {
+        serde_json::to_string_pretty(&schema_for!(CognitiveUnitPair)).unwrap()
+    }
+}
 
 fn main() -> anyhow::Result<()> {
     let model_path: PathBuf = "models/models--HuggingFaceTB--SmolLM2-360M-Instruct-GGUF/snapshots/593b5a2e04c8f3e4ee880263f93e0bd2901ad47f/smollm2-360m-instruct-q8_0.gguf".into();
@@ -15,22 +29,36 @@ fn main() -> anyhow::Result<()> {
         units.push(unit);
     }
 
+    let pair_description = CognitiveUnitPair::self_description();
+
+    let system_message = [
+        "You're a LLM Cognitive Unit and your unique task is to respond with your next (rule, state) based on your current rule and the states of your neighbors in json format",
+        format!("Always respond with a plain json complaint with `CognitiveUnitPair`: {}", pair_description).as_str(),
+        "The user pass to you your memory and the neighborhood states as list of 'messages' in json format",
+        "Don't put the json in a code block, don't add explanations, just return the json ready to be parsed based on the schema",
+        "Only if you rule is empty, you may to propose a new rule and your return it with the response",
+        "If you think the rule is wrong, you may to propose a new rule and your return it with the response",
+        "Example of valid response: `{\"rule\": \"rule_1\", \"state\": \"state_1\"}`",
+    ]
+    .join(".\n");
+
     let handles = units
         .into_iter()
         .map(|mut unit| {
+            let system_message = system_message.clone();
+
             thread::spawn(move || {
                 let mut context = Context::new(
                     10,
                     Message {
                         role: "system".to_string(),
-                        content: "You only answer in hex rgb code".to_string(),
+                        content: system_message,
                     },
                 );
 
                 context.push_message(Message {
                     role: "user".to_string(),
-                    content: "you're a pixel in a sunset photo, give me the #rrggbb code"
-                        .to_string(),
+                    content: "you're a pixel in a sunset photo".to_string(),
                 });
 
                 for _ in 0.. {
