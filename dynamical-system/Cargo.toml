@@ -7,15 +7,15 @@ edition = "2021"
 [dependencies]
 futures = "0.3.31"
 itertools = "0.14.0"
-kdam = "0.6.2"
-md5 = "0.7.0"
-rand = "0.8.5"
-serde = "1.0.217"
-serde_derive = "1.0.217"
-serde_json = "1.0.137"
-petgraph = { version = "0.7.1", features = ["serde-1"] }
-reqwest = { version = "0.12.12", features = ["blocking", "json"] }
-schemars = { version = "0.8.21", features = ["chrono"] }
-tokio = { version = "1.43.0", features = ["full"] }
-chrono = { version = "0.4.39", features = ["serde"] }
-toml = "0.8.20"
+kdam = "0.6.3"
+md5 = "0.8.0"
+rand = "0.9.2"
+serde = "1.0.228"
+serde_derive = "1.0.228"
+serde_json = "1.0.145"
+petgraph = { version = "0.8.3", features = ["serde-1"] }
+reqwest = { version = "0.12.23", features = ["blocking", "json"] }
+schemars = { version = "1.0.4", features = ["chrono04"] }
+tokio = { version = "1.47.1", features = ["full"] }
+chrono = { version = "0.4.42", features = ["serde"] }
+toml = "0.9.7"

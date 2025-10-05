@@ -5,7 +5,8 @@ members = [
     "minimal-ui",
     "observatory",
     "server",
-    "source", "swarm",
+    "source",
+    "swarm",
 ]
 resolver = "2"
 

@@ -201,7 +201,14 @@ impl CognitiveUnitWithMemory {
             .await
             .unwrap();
 
+        println!("res: {:?}", res);
+
         let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
+        // .unwrap_or_else(|err| {
+        //     println!("err: {:?}", err);
+
+        //     ChatCompletionResponse::default()
+        // });
 
         Ok(parsed_res)
     }

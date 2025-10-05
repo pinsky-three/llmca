@@ -16,6 +16,7 @@ pub struct Entity {
     space: CognitiveSpaceWithMemory,
     step: u32,
     state: EntityState,
+    manager: Box<LifeManager>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -54,6 +55,7 @@ impl Entity {
             space,
             step,
             state: EntityState::Idle,
+            manager: Box::new(manager.clone()),
         };
 
         ent.save_serialized();
@@ -75,7 +77,7 @@ impl Entity {
         .unwrap();
     }
 
-    pub fn open_saved(artifacts_folder: PathBuf) -> Self {
+    pub fn open_saved(artifacts_folder: PathBuf, manager: LifeManager) -> Self {
         let folder = read_dir(&artifacts_folder).unwrap();
 
         let steps = folder
@@ -113,6 +115,7 @@ impl Entity {
             space,
             step: *last_step,
             state: EntityState::Idle,
+            manager: Box::new(manager),
         }
     }
 
@@ -145,7 +148,7 @@ impl Entity {
     }
 
     pub async fn evolve_async(&mut self) {
-        self.space.distributed_step().await;
+        self.space.distributed_step(self.manager.resolvers()).await;
         self.step += 1;
 
         self.save_serialized();

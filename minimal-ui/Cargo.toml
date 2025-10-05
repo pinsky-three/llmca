@@ -5,14 +5,14 @@ edition = "2021"
 
 [dependencies]
 dotenv = "0.15.0"
-eframe = "0.29.1"
-egui = "0.29.1"
-egui_graphs = "0.22.0"
+eframe = "0.32.3"
+egui = "0.32.3"
+egui_graphs = "0.28.0"
 futures = "0.3.31"
-image = "0.25.5"
-itertools = "0.13.0"
-kdam = "0.6.1"
-macroquad = "0.4.13"
-md5 = "0.7.0"
-tokio = { version = "1.41.1", features = ["full"] }
+image = "0.25.8"
+itertools = "0.14.0"
+kdam = "0.6.3"
+macroquad = "0.4.14"
+md5 = "0.8.0"
+tokio = { version = "1.47.1", features = ["full"] }
 dynamical-system = { path = "../dynamical-system" }

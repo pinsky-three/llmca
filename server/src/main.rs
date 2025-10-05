@@ -19,12 +19,12 @@ pub struct CognitiveUnitComplex {
     pub feedback: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
-struct InteractionPayload {
-    i: usize,
-    j: usize,
-    update_unit: CognitiveUnitComplex,
-}
+// #[derive(Deserialize, Serialize)]
+// struct InteractionPayload {
+//     i: usize,
+//     j: usize,
+//     update_unit: CognitiveUnitComplex,
+// }
 
 #[OpenApi]
 impl Api {

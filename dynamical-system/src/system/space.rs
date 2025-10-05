@@ -86,27 +86,37 @@ impl CognitiveSpaceWithMemory {
         serde_json::from_str(json).unwrap()
     }
 
-    pub async fn distributed_step(&mut self) {
+    pub async fn distributed_step(&mut self, resolvers: &[LLMResolver]) {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
 
         // let mut rng = ThreadRng::default();
-        let mut rng = StdRng::from_entropy();
+        let mut rng = StdRng::from_os_rng();
 
         nodes.shuffle(&mut rng);
 
-        let base_api_urls =
-            env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string());
-        let models = env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string());
-        let secret_keys = env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string());
-
-        let base_api_urls = base_api_urls
-            .split(',')
-            .map(|s| s.trim())
+        let base_api_urls = resolvers
+            .iter()
+            .map(|r| r.api_url.clone())
             .collect::<Vec<_>>();
 
-        let models = models.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+        let models = resolvers
+            .iter()
+            .map(|r| r.model_name.clone())
+            .collect::<Vec<_>>();
 
-        let secret_keys = secret_keys.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+        let secret_keys = resolvers
+            .iter()
+            .map(|r| r.api_key.clone())
+            .collect::<Vec<_>>();
+
+        // let base_api_urls = base_api_urls
+        //     .split(',')
+        //     .map(|s| s.trim())
+        //     .collect::<Vec<_>>();
+
+        // let models = models.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+
+        // let secret_keys = secret_keys.split(',').map(|s| s.trim()).collect::<Vec<_>>();
 
         if base_api_urls.len() != models.len() || models.len() != secret_keys.len() {
             panic!("The number of base_api_urls, models, and secret_keys must be the same.");
@@ -114,15 +124,15 @@ impl CognitiveSpaceWithMemory {
 
         let computation_units = (0..base_api_urls.len())
             .map(|i| {
-                let base_api = base_api_urls[i];
-                let model_name = models[i];
-                let secret_key = secret_keys[i];
+                let base_api = base_api_urls[i].clone();
+                let model_name = models[i].clone();
+                let secret_key = secret_keys[i].clone();
 
                 (base_api, model_name, secret_key)
             })
             .collect::<Vec<_>>();
 
-        println!("computation_units: {:?}", computation_units);
+        // println!("computation_units: {:?}", computation_units);
 
         let mut pb: kdam::Bar = tqdm!(total = nodes.len());
 
@@ -192,7 +202,7 @@ impl CognitiveSpaceWithMemory {
         // }
 
         // let mut rng = ThreadRng::default();
-        let mut rng = StdRng::from_entropy();
+        let mut rng = StdRng::from_os_rng();
 
         nodes.shuffle(&mut rng);
 

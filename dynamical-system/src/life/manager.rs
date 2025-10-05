@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use crate::system::space::{load_llm_resolvers_from_env, LLMResolver};
-
 use super::entity::Entity;
+use crate::system::space::{load_llm_resolvers_from_toml, LLMResolver};
+use serde_derive::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LifeManager {
     root_folder: PathBuf,
     loaded_entities: Vec<Entity>,
@@ -19,17 +19,19 @@ impl Default for LifeManager {
             std::fs::create_dir(&root_folder).unwrap();
         }
 
+        let resolvers = load_llm_resolvers_from_toml("resolvers.toml");
+
         let mut instance = Self {
             root_folder,
+            resolvers,
             loaded_entities: vec![],
-            resolvers: load_llm_resolvers_from_env(),
         };
 
         instance.list_entities().iter().for_each(|entity_folder| {
             let folder_name = instance.root_folder.join(entity_folder.clone());
             println!("Loading entity from {:?}", folder_name);
 
-            let entity = Entity::open_saved(folder_name);
+            let entity = Entity::open_saved(folder_name, instance.clone());
             instance.loaded_entities.push(entity);
         });
 
