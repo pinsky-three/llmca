@@ -23,7 +23,7 @@ async fn main() {
 
     let manager = LifeManager::default();
 
-    let size = (10, 10);
+    let size = (20, 20);
 
     let initial_state = (0..size.0)
         .cartesian_product(0..size.1)

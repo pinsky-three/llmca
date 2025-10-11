@@ -18,12 +18,15 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
 
 ## Features
 
-- **Cognitive Units:**  Each cell acts as a cognitive unit with memory, storing its past states.
-- **LLM-Driven Evolution:**  Cells determine their next state by querying an LLM, providing their history and their neighbors' current states. The LLM responds with a new state and optionally, an updated rule.
+- **Cognitive Units with Memory:**  Each cell acts as a cognitive unit with configurable temporal memory, storing its past states with timestamps for historical awareness.
+- **LLM-Driven Evolution:**  Cells determine their next state by querying an LLM, providing their memory history and their neighbors' current states. The LLM responds with a new state and optionally, an updated rule using structured JSON schemas (`CognitiveUnitPair`).
 - **Von Neumann Neighborhood:**  Cells interact with their immediate neighbors in a 2D grid using the Von Neumann neighborhood (north, south, east, west, and diagonals).
-- **Distributed Computation:** Supports distributing computations across multiple LLM API instances for improved performance.
+- **Distributed Computation:** Supports distributing computations across multiple LLM API instances for improved performance with parallel task execution.
+- **Entity Management System:** Built-in `LifeManager` for managing multiple simulation entities with persistence and lifecycle management.
+- **Flexible API Configuration:** Support for multiple LLM resolvers via TOML configuration (`resolvers.toml`) or environment variables, allowing heterogeneous API backends.
+- **JSON Schema Integration:** Uses `schemars` for automatic schema generation, ensuring type-safe communication between the simulation and LLM APIs.
 - **Visualization:**  Renders the simulation in real-time using Macroquad, representing cell states with colors derived from hexadecimal strings returned by the LLM.
-- **Persistence:** Saves the simulation state to disk, allowing resumption from previous steps.
+- **Persistence:** Saves the simulation state to disk (in `.life` directory), allowing resumption from previous steps.
 
 
 ## Requirements
@@ -40,8 +43,26 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
 
 ## Usage
 
-1. **Environment Variables:** Create a `.env` file in the project root with the following:
+1. **API Configuration:** Configure LLM resolvers using one of two methods:
 
+   **Option A: TOML Configuration (Recommended)**
+
+   Create a `resolvers.toml` file in the project root:
+   ```toml
+   [[resolvers]]
+   api_url = "http://localhost:11434/v1"
+   model_name = "phi3"
+   api_key = "ollama"
+
+   [[resolvers]]
+   api_url = "http://localhost:11435/v1"
+   model_name = "llama2"
+   api_key = "ollama"
+   ```
+
+   **Option B: Environment Variables**
+
+   Create a `.env` file in the project root:
    ```bash
    OPENAI_API_URL="http://your_api_url:port/v1" # Comma-separated for multiple APIs
    OPENAI_MODEL_NAME="your_model_name" # Comma-separated for multiple models
@@ -53,7 +74,20 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
 
 ## Simulation Example
 
-The LLM receives a JSON input representing a cell's memory (previous states) and its neighbors' current states.  It's instructed to return a JSON object containing the next state and optionally, a new rule.
+The LLM receives a JSON input representing a cell's memory (previous states) and its neighbors' current states.  It's instructed to return a JSON object containing the next state and optionally, a new rule following the `CognitiveUnitPair` schema.
+
+**Example LLM System Prompt:**
+
+```
+You're a LLM Cognitive Unit and your unique task is to respond with your next (rule, state)
+based on your current rule and the states of your neighbors in json format.
+Always respond with a plain json compliant with `CognitiveUnitPair` schema.
+The user passes your memory and the neighborhood states as a list of 'messages' in json format.
+Don't put the json in a code block, don't add explanations, just return the json ready to be parsed.
+Only if your rule is empty, you may propose a new rule and return it with the response.
+If you think the rule is wrong, you may propose a new rule and return it with the response.
+Example of valid response: `{"rule": "rule_1", "state": "state_1"}`
+```
 
 **Example LLM Input (Simplified):**
 
@@ -61,9 +95,10 @@ The LLM receives a JSON input representing a cell's memory (previous states) and
 [
   "self memory",
   {"rule": "be red if neighbors are green", "state": "#ff0000"},
+  {"rule": "be red if neighbors are green", "state": "#ff0000"},
   "neighbors",
   {"rule": "...", "state": "#00ff00"},
-  {"rule": "...", "state": "#00ff00"} 
+  {"rule": "...", "state": "#00ff00"}
 ]
 ```
 
@@ -73,7 +108,7 @@ The LLM receives a JSON input representing a cell's memory (previous states) and
 {"rule": "be red if neighbors are green", "state": "#ff0000"}
 ```
 
-The visualization then interprets the `state` (e.g., `#ff0000`) as a color.
+The visualization then interprets the `state` (e.g., `#ff0000`) as a color. The simulation maintains a temporal memory (configurable size) of past states for each cognitive unit, allowing the LLM to consider historical patterns when determining the next state.
 
 
 ## Contributions

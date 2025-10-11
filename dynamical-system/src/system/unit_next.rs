@@ -145,7 +145,7 @@ impl CognitiveUnitWithMemory {
             // .trim_matches(['`', '[', ']', '\n'])
             .to_string();
 
-        println!("res_content: [{:?}]`", res_content);
+        // println!("res_content: [{:?}]`", res_content);
 
         match serde_json::from_str::<CognitiveUnitPair>(&res_content) {
             Ok(output) => CognitiveUnitComplex {
@@ -201,7 +201,7 @@ impl CognitiveUnitWithMemory {
             .await
             .unwrap();
 
-        println!("res: {:?}", res);
+        // println!("res: {:?}", res);
 
         let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
         // .unwrap_or_else(|err| {
