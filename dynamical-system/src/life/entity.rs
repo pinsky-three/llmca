@@ -4,8 +4,10 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::system::{
     space::{build_lattice_with_memory, CognitiveSpaceWithMemory, LLMResolver},
+    telemetry::StepTelemetry,
     unit_next::CognitiveUnitPair,
 };
+use tracing::{info, instrument};
 
 use super::manager::LifeManager;
 
@@ -147,11 +149,28 @@ impl Entity {
         unique_states
     }
 
-    pub async fn evolve_async(&mut self) {
-        self.space.distributed_step(self.manager.resolvers()).await;
+    #[instrument(skip_all, fields(entity_id = %self._id, current_step = self.step, next_step = self.step + 1))]
+    pub async fn evolve_async(&mut self) -> StepTelemetry {
+        self.state = EntityState::ComputingStep(self.step + 1);
+        let telemetry = self.space.distributed_step(self.manager.resolvers()).await;
         self.step += 1;
 
         self.save_serialized();
+        self.state = EntityState::Idle;
+
+        info!(
+            entity_id = %self._id,
+            step = self.step,
+            units_total = telemetry.units_total,
+            units_completed = telemetry.units_completed,
+            unique_states = telemetry.unique_states,
+            parse_failures = telemetry.parse_failures,
+            llm_failures = telemetry.llm_failures,
+            elapsed_ms = telemetry.elapsed_ms,
+            "entity_evolved"
+        );
+
+        telemetry
     }
 
     pub fn state(&self) -> &EntityState {
@@ -168,7 +187,7 @@ impl Entity {
         resolvers: &[LLMResolver],
         // tx: Sender<bool>,
         // self_outside: &mut Arc<Mutex<Self>>,
-    ) {
+    ) -> StepTelemetry {
         self.state = EntityState::ComputingStep(self.step + 1);
         // let entity_ptr = self.clone().to_owned(); // raw pointer is safe if you guarantee it won't drop
 
@@ -178,12 +197,11 @@ impl Entity {
 
         // let cloned_self = Arc::clone(&shared_self);
 
-        println!("d");
-        self.space
+        let telemetry = self
+            .space
             .distributed_step_with_tasks(resolvers, handle)
             .await;
 
-        println!("e");
         // let mut self_locked = self.lock().await;
 
         self.step += 1;
@@ -192,6 +210,18 @@ impl Entity {
 
         // tx.send(true).unwrap();
 
-        println!("f");
+        info!(
+            entity_id = %self._id,
+            step = self.step,
+            units_total = telemetry.units_total,
+            units_completed = telemetry.units_completed,
+            unique_states = telemetry.unique_states,
+            parse_failures = telemetry.parse_failures,
+            llm_failures = telemetry.llm_failures,
+            elapsed_ms = telemetry.elapsed_ms,
+            "entity_evolved"
+        );
+
+        telemetry
     }
 }

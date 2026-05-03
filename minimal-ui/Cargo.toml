@@ -16,3 +16,5 @@ macroquad = "0.4.14"
 md5 = "0.8.0"
 tokio = { version = "1.47.1", features = ["full"] }
 dynamical-system = { path = "../dynamical-system" }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }

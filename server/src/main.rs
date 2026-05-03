@@ -5,6 +5,8 @@ use poem::{listener::TcpListener, middleware::Cors, EndpointExt, Route};
 use poem_openapi::{param::Path, payload::Json, OpenApi, OpenApiService};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Debug)]
 struct Api {
@@ -60,8 +62,8 @@ impl Api {
 
         match life_manager.get_mut_entity(&id.0) {
             Some(entity) => {
-                entity.evolve_async().await;
-                Json(json!({ "status": "done" }))
+                let telemetry = entity.evolve_async().await;
+                Json(json!({ "status": "done", "telemetry": telemetry }))
             }
             None => Json(json!({ "error": "entity not found" })),
         }
@@ -98,6 +100,8 @@ impl Api {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
+    init_tracing();
+
     let api_service = OpenApiService::new(
         Api {
             life_manager: Arc::new(LifeManager::default()),
@@ -115,7 +119,19 @@ async fn main() -> Result<(), std::io::Error> {
             .allow_headers(vec!["Content-Type", "Authorization"]),
     );
 
+    info!(addr = "0.0.0.0:8000", "server_starting");
+
     poem::Server::new(TcpListener::bind("0.0.0.0:8000"))
         .run(app)
         .await
+}
+
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(true)
+        .json()
+        .try_init();
 }

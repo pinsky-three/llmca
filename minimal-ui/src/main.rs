@@ -5,6 +5,7 @@ use dynamical_system::{
 };
 use itertools::Itertools;
 use macroquad::prelude::*;
+use tracing_subscriber::EnvFilter;
 
 fn window_conf() -> Conf {
     Conf {
@@ -18,12 +19,13 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     dotenv().ok();
+    init_tracing();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let manager = LifeManager::default();
 
-    let size = (20, 20);
+    let size = (5, 5);
 
     let initial_state = (0..size.0)
         .cartesian_product(0..size.1)
@@ -47,10 +49,12 @@ async fn main() {
             .map(|state| (state, get_color_from_hex_string(state)))
             .collect::<std::collections::HashMap<_, _>>();
 
-        println!(
-            "states: {:?}",
-            states_to_colors.keys().sorted().collect::<Vec<_>>()
-        );
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            tracing::debug!(
+                states = ?states_to_colors.keys().sorted().collect::<Vec<_>>(),
+                "minimal_ui_render_states"
+            );
+        }
 
         entity.loaded_space().get_units().iter().for_each(|unit| {
             let state = &unit.memory.last().unwrap().state;
@@ -72,10 +76,20 @@ async fn main() {
 
         next_frame().await;
 
-        rt.block_on(async {
-            entity.evolve_async().await;
-        });
+        let telemetry = rt.block_on(async { entity.evolve_async().await });
+
+        tracing::debug!(?telemetry, "minimal_ui_evolved_frame");
     }
+}
+
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(true)
+        .json()
+        .try_init();
 }
 
 fn get_color_from_hex_string(hex: &str) -> Color {

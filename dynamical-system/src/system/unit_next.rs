@@ -5,6 +5,8 @@ use schemars::{schema_for, JsonSchema};
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::time::Instant;
+use tracing::{debug, instrument, warn};
 
 use crate::{system::api::ChatCompletionResponse, system::unit::CognitiveContext};
 
@@ -90,6 +92,7 @@ impl CognitiveUnitWithMemory {
         }
     }
 
+    #[instrument(skip_all, fields(position = ?self.position, model = %ctx.model_name, base_api = %ctx.base_api, memory = self.memory.len(), neighbors = neighbors.len()))]
     pub async fn calculate_next_complex(
         &self,
         ctx: &CognitiveContext,
@@ -128,16 +131,51 @@ impl CognitiveUnitWithMemory {
             ]
             .join(".\n");
 
-        let res = Self::generic_chat_completion(ctx, system_message, input_payload).await;
+        let res = match Self::generic_chat_completion(ctx, system_message, input_payload).await {
+            Ok(res) => res,
+            Err(err) => {
+                warn!(
+                    model = %ctx.model_name,
+                    base_api = %ctx.base_api,
+                    position = ?self.position,
+                    error = %err,
+                    "llm_request_failed"
+                );
 
-        let res_content = res
-            .unwrap()
-            .choices
-            .first()
-            .unwrap()
-            .clone()
-            .message
-            .content;
+                return self.fallback_complex(&neighbors, format!("LLM request failed: {err}"));
+            }
+        };
+
+        let Some(choice) = res.choices.first() else {
+            warn!(
+                model = %ctx.model_name,
+                base_api = %ctx.base_api,
+                position = ?self.position,
+                "llm_response_missing_choices"
+            );
+
+            return self.fallback_complex(
+                &neighbors,
+                "LLM request failed: response did not include choices".to_string(),
+            );
+        };
+
+        let res_content = choice.message.content.clone();
+
+        if tracing::enabled!(target: "llmca::model_response", tracing::Level::DEBUG) {
+            debug!(
+                target: "llmca::model_response",
+                model = %ctx.model_name,
+                base_api = %ctx.base_api,
+                position = ?self.position,
+                finish_reason = %choice.finish_reason,
+                prompt_tokens = res.usage.prompt_tokens,
+                completion_tokens = res.usage.completion_tokens,
+                total_tokens = res.usage.total_tokens,
+                response_content = %res_content,
+                "llm_model_response"
+            );
+        }
 
         let res_content = res_content
             .trim_matches(['`', '[', ']', '\n', 'j', 's', 'o', 'n'])
@@ -155,21 +193,47 @@ impl CognitiveUnitWithMemory {
                 neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
                 feedback: "".to_string(),
             },
-            Err(err) => CognitiveUnitComplex {
-                timestamp: Utc::now(),
-                rule: self.memory.last().unwrap().rule.clone(),
-                state: self.memory.last().unwrap().state.clone(),
-                neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
-                feedback: format!("Response Content: `{}`. Error: `{}`", res_content, err),
-            },
+            Err(err) => {
+                warn!(
+                    model = %ctx.model_name,
+                    base_api = %ctx.base_api,
+                    position = ?self.position,
+                    response_len = res_content.len(),
+                    error = %err,
+                    "llm_response_parse_failed"
+                );
+
+                self.fallback_complex(
+                    &neighbors,
+                    format!("Response Content: `{}`. Error: `{}`", res_content, err),
+                )
+            }
         }
     }
 
+    fn fallback_complex(
+        &self,
+        neighbors: &[CognitiveUnitPair],
+        feedback: String,
+    ) -> CognitiveUnitComplex {
+        let previous = self.memory.last().cloned().unwrap_or_default();
+
+        CognitiveUnitComplex {
+            timestamp: Utc::now(),
+            rule: previous.rule,
+            state: previous.state,
+            neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
+            feedback,
+        }
+    }
+
+    #[instrument(skip_all, fields(model = %ctx.model_name, base_api = %ctx.base_api, messages = user_messages.len()))]
     async fn generic_chat_completion(
         ctx: &CognitiveContext,
         system_message: String,
         user_messages: Vec<String>,
-    ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error>> {
+    ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error + Send + Sync>> {
+        let started_at = Instant::now();
         let mut headers = header::HeaderMap::new();
 
         headers.insert("Content-Type", "application/json".parse().unwrap());
@@ -198,12 +262,28 @@ impl CognitiveUnitWithMemory {
             .headers(headers)
             .body(body.to_string())
             .send()
-            .await
-            .unwrap();
+            .await?;
 
-        // println!("res: {:?}", res);
+        let status = res.status();
 
-        let parsed_res = res.json::<ChatCompletionResponse>().await.unwrap();
+        if !status.is_success() {
+            let body = res.text().await.unwrap_or_default();
+            let body = body.chars().take(512).collect::<String>();
+
+            return Err(std::io::Error::other(format!("LLM API returned {status}: {body}")).into());
+        }
+
+        let parsed_res = res.json::<ChatCompletionResponse>().await?;
+
+        debug!(
+            model = %ctx.model_name,
+            base_api = %ctx.base_api,
+            prompt_tokens = parsed_res.usage.prompt_tokens,
+            completion_tokens = parsed_res.usage.completion_tokens,
+            total_tokens = parsed_res.usage.total_tokens,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "llm_request_completed"
+        );
         // .unwrap_or_else(|err| {
         //     println!("err: {:?}", err);
 

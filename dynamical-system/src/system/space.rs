@@ -8,14 +8,15 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use reqwest::Client;
 
-use serde::{Deserialize, Serialize};
-// use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{
+    system::telemetry::StepTelemetry,
     system::unit::CognitiveContext,
     system::unit_next::{CognitiveUnitComplex, CognitiveUnitPair, CognitiveUnitWithMemory},
 };
-use std::{env, fmt::Debug, path::Path, vec};
+use std::{collections::HashSet, env, fmt::Debug, path::Path, time::Instant, vec};
+use tracing::{info, instrument, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CognitiveTask {
@@ -86,8 +87,11 @@ impl CognitiveSpaceWithMemory {
         serde_json::from_str(json).unwrap()
     }
 
-    pub async fn distributed_step(&mut self, resolvers: &[LLMResolver]) {
+    #[instrument(skip_all, fields(units = self.graph.node_count(), resolvers = resolvers.len()))]
+    pub async fn distributed_step(&mut self, resolvers: &[LLMResolver]) -> StepTelemetry {
+        let started_at = Instant::now();
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
+        let mut telemetry = StepTelemetry::new(nodes.len(), resolvers.len());
 
         // let mut rng = ThreadRng::default();
         let mut rng = StdRng::from_os_rng();
@@ -132,11 +136,18 @@ impl CognitiveSpaceWithMemory {
             })
             .collect::<Vec<_>>();
 
+        if computation_units.is_empty() {
+            warn!("distributed_step_skipped_no_resolvers");
+            telemetry.finish(started_at.elapsed(), self.unique_state_count());
+            return telemetry;
+        }
+
         // println!("computation_units: {:?}", computation_units);
 
         let mut pb: kdam::Bar = tqdm!(total = nodes.len());
 
         for chunk in nodes.chunks(computation_units.len()) {
+            telemetry.record_chunk();
             let mut tasks = vec![];
 
             for (i, &node) in chunk.iter().enumerate() {
@@ -174,105 +185,55 @@ impl CognitiveSpaceWithMemory {
                 let node = chunk[i];
                 let unit = self.graph.node_weight_mut(node).unwrap();
 
-                let next_state = next_state.unwrap_or_else(|err| {
-                    println!("err: {:?}", err);
+                let next_state = match next_state {
+                    Ok(next_state) => next_state,
+                    Err(err) => {
+                        warn!(error = ?err, "llm_task_join_failed");
 
-                    CognitiveUnitComplex::default()
-                });
+                        let previous = unit.memory.last().cloned().unwrap_or_default();
+
+                        CognitiveUnitComplex {
+                            timestamp: Utc::now(),
+                            rule: previous.rule,
+                            state: previous.state,
+                            neighbors: vec![],
+                            feedback: format!("LLM request failed: task join error: {err}"),
+                        }
+                    }
+                };
 
                 // unit.state = next_state.calculated_state;
                 // unit.feedback = next_state.feedback;
 
+                telemetry.record_unit(&next_state);
                 unit.add_memory(next_state);
 
                 pb.update(1).ok();
             }
         }
+
+        telemetry.finish(started_at.elapsed(), self.unique_state_count());
+        info!(
+            units_total = telemetry.units_total,
+            units_completed = telemetry.units_completed,
+            resolver_count = telemetry.resolver_count,
+            chunks = telemetry.chunks,
+            llm_failures = telemetry.llm_failures,
+            parse_failures = telemetry.parse_failures,
+            unique_states = telemetry.unique_states,
+            elapsed_ms = telemetry.elapsed_ms,
+            "distributed_step_completed"
+        );
+
+        telemetry
     }
 
     pub async fn distributed_step_with_tasks(
         &mut self,
         resolvers: &[LLMResolver],
-        handle: &tokio::runtime::Handle,
-    ) {
-        let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
-
-        // if self.computing_tasks.is_none() {
-        // self.computing_tasks = Some(vec![]); // reset at start new distributed step
-        // }
-
-        // let mut rng = ThreadRng::default();
-        let mut rng = StdRng::from_os_rng();
-
-        nodes.shuffle(&mut rng);
-
-        let computation_units: Vec<(String, String, String)> = resolvers
-            .iter()
-            .map(|r| (r.api_url.clone(), r.model_name.clone(), r.api_key.clone()))
-            .collect();
-
-        // let mut pb: kdam::Bar = tqdm!(total = nodes.len());
-
-        for chunk in nodes.chunks(computation_units.len()) {
-            let mut tasks = vec![];
-
-            for (i, &node) in chunk.iter().enumerate() {
-                let neighbors = self
-                    .graph
-                    .neighbors(node)
-                    .map(|neighbor| {
-                        let neighbor_unit = self.graph.node_weight(neighbor).unwrap();
-
-                        // (
-                        // format!("n_{}", neighbor.index()),
-                        neighbor_unit.memory.last().unwrap().to_pair()
-                        // )
-                    })
-                    .collect::<Vec<_>>();
-
-                let unit = self.graph.node_weight_mut(node).unwrap().clone();
-                let ctx = CognitiveContext {
-                    client: Box::new(Client::new()),
-                    base_api: computation_units[i].0.to_string(),
-                    model_name: computation_units[i].1.to_string(),
-                    secret_key: computation_units[i].2.to_string(),
-                };
-
-                // self.computing_tasks.as_mut().unwrap().push(CognitiveTask {
-                //     unit: unit.clone(),
-                //     total_units: nodes.len(),
-                // });
-
-                tasks.push(handle.spawn(async move {
-                    // unit.calculate_next_state(&ctx, neighbors).await
-
-                    unit.calculate_next_complex(&ctx, neighbors).await
-                }));
-            }
-
-            let next_states = futures::future::join_all(tasks).await;
-
-            for (i, next_state) in next_states.into_iter().enumerate() {
-                let node = chunk[i];
-                let unit = self.graph.node_weight_mut(node).unwrap();
-
-                let next_state = next_state.unwrap_or_else(|err| {
-                    println!("err: {:?}", err);
-                    CognitiveUnitComplex::default()
-                });
-
-                // unit.state = next_state.calculated_state;
-                // unit.feedback = next_state.feedback;
-
-                unit.add_memory(next_state);
-
-                // self.computing_tasks.as_mut().unwrap().pop();
-
-                // pb.update(1).ok();
-            }
-        }
-
-        // self.computing_tasks = None;
+        _handle: &tokio::runtime::Handle,
+    ) -> StepTelemetry {
+        self.distributed_step(resolvers).await
     }
 
     pub fn generate_graph(&self) -> StableGraph<CognitiveUnitWithMemory, (), Undirected> {
@@ -297,6 +258,14 @@ impl CognitiveSpaceWithMemory {
 
     pub fn serialize_in_pretty_json(&self) -> String {
         serde_json::to_string_pretty(&self).unwrap()
+    }
+
+    fn unique_state_count(&self) -> usize {
+        self.graph
+            .node_weights()
+            .filter_map(|unit| unit.memory.last().map(|memory| memory.state.as_str()))
+            .collect::<HashSet<_>>()
+            .len()
     }
 
     // pub fn computing_tasks(&self) -> Vec<CognitiveTask> {

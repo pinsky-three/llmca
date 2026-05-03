@@ -72,6 +72,30 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
 
 2. **Run:** `cargo run -p minimal-ui`
 
+## Observability
+
+Runtime binaries initialize structured JSON logs with `tracing-subscriber`.
+The default log level is `info`, which records step-level telemetry without
+logging every model response:
+
+```bash
+RUST_LOG=info cargo run -p minimal-ui
+```
+
+Each completed evolution step logs unit count, resolver count, chunks,
+unique-state count, parse failures, LLM transport failures, and elapsed time.
+The API also returns the same telemetry from `POST /api/entity/:id/evolve`.
+
+Raw model responses are available behind a targeted debug filter so normal runs
+avoid high-volume logging and formatting overhead:
+
+```bash
+RUST_LOG=info,llmca::model_response=debug cargo run -p minimal-ui
+```
+
+Do not enable `llmca::model_response=debug` when prompts or model outputs may
+contain sensitive data. API keys are never emitted by the structured logs.
+
 ## Simulation Example
 
 The LLM receives a JSON input representing a cell's memory (previous states) and its neighbors' current states.  It's instructed to return a JSON object containing the next state and optionally, a new rule following the `CognitiveUnitPair` schema.

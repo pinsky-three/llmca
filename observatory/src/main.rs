@@ -11,11 +11,12 @@ use dynamical_system::{
 use eframe::egui::{self, CornerRadius, Frame, Margin, Sense, Slider, UiBuilder, Vec2};
 use itertools::Itertools;
 use tokio::sync::Mutex;
+use tracing_subscriber::EnvFilter;
 
 fn main() -> eframe::Result {
     dotenv().ok();
+    init_tracing();
 
-    env_logger::init();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1024.0, 1024.0]),
         ..Default::default()
@@ -42,7 +43,10 @@ impl Default for LifeManagerApp {
         let mut manager = LifeManager::default();
         let resolvers = load_llm_resolvers_from_toml("resolvers.toml");
 
-        println!("resolvers: {:?}", resolvers);
+        tracing::info!(
+            resolver_count = resolvers.len(),
+            "observatory_loaded_resolvers"
+        );
 
         manager.set_resolvers(resolvers);
 
@@ -152,7 +156,7 @@ impl eframe::App for LifeManagerApp {
                         let entity =
                             Entity::new_2d_lattice(&manager, initial_state, size, temporal_memory_size);
 
-                        println!("entity: {:?}", entity);
+                        tracing::info!(entity_id = entity.id(), "observatory_entity_created");
 
                     }
                 });
@@ -201,7 +205,8 @@ impl eframe::App for LifeManagerApp {
                         let resolvers = self.life_manager.resolvers().to_owned();
 
                         self.runtime.spawn(async move {
-                            entity_clone.lock().await.evolve(&handle, &resolvers).await;
+                            let telemetry = entity_clone.lock().await.evolve(&handle, &resolvers).await;
+                            tracing::debug!(?telemetry, "observatory_entity_evolved");
                         });
                     }
 
@@ -319,4 +324,14 @@ impl eframe::App for LifeManagerApp {
             }
         });
     }
+}
+
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(true)
+        .json()
+        .try_init();
 }
