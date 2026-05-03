@@ -1,14 +1,19 @@
 use chrono::{DateTime, Utc};
 
-use reqwest::header;
+use rig::{
+    client::{CompletionClient, Nothing},
+    completion::TypedPrompt,
+    extractor::ExtractorBuilder,
+    providers::{ollama, openrouter},
+};
 use schemars::{schema_for, JsonSchema};
 
 use serde_derive::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::time::Instant;
 use tracing::{debug, instrument, warn};
 
-use crate::{system::api::ChatCompletionResponse, system::unit::CognitiveContext};
+use crate::system::unit::{CognitiveContext, LLMProvider};
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CognitiveUnitComplex {
@@ -98,116 +103,76 @@ impl CognitiveUnitWithMemory {
         ctx: &CognitiveContext,
         neighbors: Vec<CognitiveUnitPair>,
     ) -> CognitiveUnitComplex {
-        let input_payload = ["self memory".to_string()]
-            .iter()
-            .chain(
-                self.memory
-                    .iter()
-                    .map(|m| serde_json::to_string_pretty(&m.to_pair()).unwrap())
-                    .collect::<Vec<String>>()
-                    .iter(),
-            )
-            .chain(["neighbors".to_string()].iter())
-            .chain(
-                neighbors
-                    .iter()
-                    .map(|n| serde_json::to_string_pretty(&n).unwrap())
-                    .collect::<Vec<String>>()
-                    .iter(),
-            )
-            .cloned()
-            .collect::<Vec<_>>();
+        let started_at = Instant::now();
+        let input_payload = json!({
+            "self_memory": self.memory.iter().map(CognitiveUnitComplex::to_pair).collect::<Vec<_>>(),
+            "neighbors": neighbors,
+        })
+        .to_string();
 
         let pair_description = CognitiveUnitPair::self_description();
 
         let system_message = [
-                "You're a LLM Cognitive Unit and your unique task is to respond with your next (rule, state) based on your current rule and the states of your neighbors in json format",
-                format!("Always respond with a plain json complaint with `CognitiveUnitPair`: {}", pair_description).as_str(),
-                "The user pass to you your memory and the neighborhood states as list of 'messages' in json format",
-                "Don't put the json in a code block, don't add explanations, just return the json ready to be parsed based on the schema",
-                "Only if you rule is empty, you may to propose a new rule and your return it with the response",
-                "If you think the rule is wrong, you may to propose a new rule and your return it with the response",
-                "Example of valid response: `{\"rule\": \"rule_1\", \"state\": \"state_1\"}`",
-            ]
-            .join(".\n");
+            "You are an LLM Cognitive Unit. Your task is to choose the next rule and state for this cell from its memory and neighbor states",
+            format!("The required output type is `CognitiveUnitPair`: {}", pair_description).as_str(),
+            "The `state` should be a compact renderable value, preferably a hexadecimal color like `#ff0000` when the simulation is visualized",
+            "Preserve the existing rule unless the memory and neighbors strongly justify a better one",
+            "Do not include prose, markdown, comments, or extra fields outside the requested structure",
+        ]
+        .join(".\n");
 
-        let res = match Self::generic_chat_completion(ctx, system_message, input_payload).await {
-            Ok(res) => res,
-            Err(err) => {
-                warn!(
-                    model = %ctx.model_name,
-                    base_api = %ctx.base_api,
-                    position = ?self.position,
-                    error = %err,
-                    "llm_request_failed"
-                );
+        let structured =
+            match Self::rig_structured_completion(ctx, &system_message, &input_payload).await {
+                Ok(structured) => structured,
+                Err(err) => {
+                    let feedback = classify_rig_error(&err.to_string());
 
-                return self.fallback_complex(&neighbors, format!("LLM request failed: {err}"));
-            }
-        };
+                    warn!(
+                        model = %ctx.model_name,
+                        base_api = %ctx.base_api,
+                        provider = ?ctx.provider,
+                        position = ?self.position,
+                        error = %err,
+                    feedback = %feedback,
+                        "llm_request_failed"
+                    );
 
-        let Some(choice) = res.choices.first() else {
-            warn!(
-                model = %ctx.model_name,
-                base_api = %ctx.base_api,
-                position = ?self.position,
-                "llm_response_missing_choices"
-            );
-
-            return self.fallback_complex(
-                &neighbors,
-                "LLM request failed: response did not include choices".to_string(),
-            );
-        };
-
-        let res_content = choice.message.content.clone();
+                    return self.fallback_complex(&neighbors, feedback);
+                }
+            };
 
         if tracing::enabled!(target: "llmca::model_response", tracing::Level::DEBUG) {
             debug!(
                 target: "llmca::model_response",
                 model = %ctx.model_name,
                 base_api = %ctx.base_api,
+                provider = ?ctx.provider,
                 position = ?self.position,
-                finish_reason = %choice.finish_reason,
-                prompt_tokens = res.usage.prompt_tokens,
-                completion_tokens = res.usage.completion_tokens,
-                total_tokens = res.usage.total_tokens,
-                response_content = %res_content,
+                prompt_tokens = structured.input_tokens,
+                completion_tokens = structured.output_tokens,
+                total_tokens = structured.total_tokens,
+                structured_output = %serde_json::to_string(&structured.pair).unwrap_or_default(),
                 "llm_model_response"
             );
         }
 
-        let res_content = res_content
-            .trim_matches(['`', '[', ']', '\n', 'j', 's', 'o', 'n'])
-            // .trim_start_matches("json")
-            // .trim_matches(['`', '[', ']', '\n'])
-            .to_string();
+        debug!(
+            model = %ctx.model_name,
+            base_api = %ctx.base_api,
+            provider = ?ctx.provider,
+            prompt_tokens = structured.input_tokens,
+            completion_tokens = structured.output_tokens,
+            total_tokens = structured.total_tokens,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "llm_request_completed"
+        );
 
-        // println!("res_content: [{:?}]`", res_content);
-
-        match serde_json::from_str::<CognitiveUnitPair>(&res_content) {
-            Ok(output) => CognitiveUnitComplex {
-                timestamp: Utc::now(),
-                rule: output.rule,
-                state: output.state,
-                neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
-                feedback: "".to_string(),
-            },
-            Err(err) => {
-                warn!(
-                    model = %ctx.model_name,
-                    base_api = %ctx.base_api,
-                    position = ?self.position,
-                    response_len = res_content.len(),
-                    error = %err,
-                    "llm_response_parse_failed"
-                );
-
-                self.fallback_complex(
-                    &neighbors,
-                    format!("Response Content: `{}`. Error: `{}`", res_content, err),
-                )
-            }
+        CognitiveUnitComplex {
+            timestamp: Utc::now(),
+            rule: structured.pair.rule,
+            state: structured.pair.state,
+            neighbors: neighbors.iter().map(|n| n.state.clone()).collect(),
+            feedback: "".to_string(),
         }
     }
 
@@ -227,69 +192,126 @@ impl CognitiveUnitWithMemory {
         }
     }
 
-    #[instrument(skip_all, fields(model = %ctx.model_name, base_api = %ctx.base_api, messages = user_messages.len()))]
-    async fn generic_chat_completion(
+    #[instrument(skip_all, fields(model = %ctx.model_name, base_api = %ctx.base_api, provider = ?ctx.provider))]
+    async fn rig_structured_completion(
         ctx: &CognitiveContext,
-        system_message: String,
-        user_messages: Vec<String>,
-    ) -> Result<ChatCompletionResponse, Box<dyn std::error::Error + Send + Sync>> {
-        let started_at = Instant::now();
-        let mut headers = header::HeaderMap::new();
+        system_message: &str,
+        user_message: &str,
+    ) -> Result<StructuredCompletion, Box<dyn std::error::Error + Send + Sync>> {
+        match ctx.provider {
+            LLMProvider::Ollama => {
+                Self::ollama_structured_completion(ctx, system_message, user_message).await
+            }
+            LLMProvider::OpenRouter => {
+                Self::openrouter_structured_completion(ctx, system_message, user_message).await
+            }
+        }
+    }
 
-        headers.insert("Content-Type", "application/json".parse().unwrap());
-        headers.insert(
-            "Authorization",
-            format!("Bearer {}", ctx.secret_key).parse().unwrap(),
-        );
+    async fn ollama_structured_completion(
+        ctx: &CognitiveContext,
+        system_message: &str,
+        user_message: &str,
+    ) -> Result<StructuredCompletion, Box<dyn std::error::Error + Send + Sync>> {
+        let client = build_ollama_client(ctx)?;
+        let agent = client
+            .agent(&ctx.model_name)
+            .preamble(system_message)
+            .temperature(0.0)
+            .build();
 
-        let user_messages_json = user_messages
-            .iter()
-            .map(|m| json!({"role": "user", "content": m}))
-            .collect::<Vec<Value>>();
-
-        let mut messages = vec![json!({"role": "system", "content": system_message})];
-
-        messages.extend_from_slice(&user_messages_json);
-
-        let body = json!({
-            "model": ctx.model_name,
-            "messages": messages,
-        });
-
-        let res = ctx
-            .client
-            .post(format!("{}/chat/completions", ctx.base_api))
-            .headers(headers)
-            .body(body.to_string())
-            .send()
+        let response = agent
+            .prompt_typed::<CognitiveUnitPair>(user_message.to_string())
+            .max_turns(1)
+            .extended_details()
             .await?;
 
-        let status = res.status();
+        Ok(StructuredCompletion::new(response.output, response.usage))
+    }
 
-        if !status.is_success() {
-            let body = res.text().await.unwrap_or_default();
-            let body = body.chars().take(512).collect::<String>();
+    async fn openrouter_structured_completion(
+        ctx: &CognitiveContext,
+        system_message: &str,
+        user_message: &str,
+    ) -> Result<StructuredCompletion, Box<dyn std::error::Error + Send + Sync>> {
+        let client = openrouter::Client::builder()
+            .api_key(ctx.secret_key.as_str())
+            .base_url(ctx.base_api.as_str())
+            .build()?;
 
-            return Err(std::io::Error::other(format!("LLM API returned {status}: {body}")).into());
+        let model = client.completion_model(&ctx.model_name).with_strict_tools();
+        let extractor = ExtractorBuilder::<_, CognitiveUnitPair>::new(model)
+            .preamble(system_message)
+            .max_tokens(512)
+            .retries(1)
+            .build();
+
+        let response = extractor
+            .extract_with_usage(user_message.to_string())
+            .await?;
+
+        Ok(StructuredCompletion::new(response.data, response.usage))
+    }
+}
+
+struct StructuredCompletion {
+    pair: CognitiveUnitPair,
+    input_tokens: u64,
+    output_tokens: u64,
+    total_tokens: u64,
+}
+
+impl StructuredCompletion {
+    fn new(pair: CognitiveUnitPair, usage: rig::completion::Usage) -> Self {
+        Self {
+            pair,
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
         }
+    }
+}
 
-        let parsed_res = res.json::<ChatCompletionResponse>().await?;
+fn build_ollama_client(
+    ctx: &CognitiveContext,
+) -> Result<ollama::Client, Box<dyn std::error::Error + Send + Sync>> {
+    let base_url = normalize_ollama_base_url(&ctx.base_api);
+    let api_key = ctx.secret_key.trim();
 
-        debug!(
-            model = %ctx.model_name,
-            base_api = %ctx.base_api,
-            prompt_tokens = parsed_res.usage.prompt_tokens,
-            completion_tokens = parsed_res.usage.completion_tokens,
-            total_tokens = parsed_res.usage.total_tokens,
-            elapsed_ms = started_at.elapsed().as_millis() as u64,
-            "llm_request_completed"
-        );
-        // .unwrap_or_else(|err| {
-        //     println!("err: {:?}", err);
+    let client = if api_key.is_empty() || api_key == "_" || api_key.eq_ignore_ascii_case("ollama") {
+        ollama::Client::builder()
+            .api_key(Nothing)
+            .base_url(base_url)
+            .build()?
+    } else {
+        ollama::Client::builder()
+            .api_key(api_key)
+            .base_url(base_url)
+            .build()?
+    };
 
-        //     ChatCompletionResponse::default()
-        // });
+    Ok(client)
+}
 
-        Ok(parsed_res)
+fn normalize_ollama_base_url(api_url: &str) -> String {
+    let trimmed = api_url.trim_end_matches('/');
+
+    if let Some(base) = trimmed.strip_suffix("/api/v1") {
+        base.to_string()
+    } else if let Some(base) = trimmed.strip_suffix("/v1") {
+        base.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn classify_rig_error(error: &str) -> String {
+    if error.contains("DeserializationError")
+        || error.contains("No data extracted")
+        || error.contains("EmptyResponse")
+    {
+        format!("Structured output failed: {error}")
+    } else {
+        format!("LLM request failed: {error}")
     }
 }

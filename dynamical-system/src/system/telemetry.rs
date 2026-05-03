@@ -34,7 +34,8 @@ impl StepTelemetry {
 
         if unit.feedback.starts_with("LLM request failed") {
             self.llm_failures += 1;
-        } else if !unit.feedback.is_empty() {
+        } else if unit.feedback.starts_with("Structured output failed") || !unit.feedback.is_empty()
+        {
             self.parse_failures += 1;
         }
     }

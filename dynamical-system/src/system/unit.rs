@@ -6,6 +6,31 @@ use serde_json::json;
 
 use crate::system::api::ChatCompletionResponse;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LLMProvider {
+    Ollama,
+    OpenRouter,
+}
+
+impl LLMProvider {
+    pub fn infer_from_api_url(api_url: &str) -> Self {
+        if api_url.to_ascii_lowercase().contains("openrouter") {
+            Self::OpenRouter
+        } else {
+            Self::Ollama
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "ollama" => Some(Self::Ollama),
+            "openrouter" | "open-router" => Some(Self::OpenRouter),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct CognitiveUnit {
     pub rule: String,
@@ -19,6 +44,7 @@ pub struct CognitiveContext {
     pub base_api: String,
     pub model_name: String,
     pub secret_key: String,
+    pub provider: LLMProvider,
 }
 
 pub struct LLMComputationResult {

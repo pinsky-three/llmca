@@ -12,11 +12,18 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     system::telemetry::StepTelemetry,
-    system::unit::CognitiveContext,
+    system::unit::{CognitiveContext, LLMProvider},
     system::unit_next::{CognitiveUnitComplex, CognitiveUnitPair, CognitiveUnitWithMemory},
 };
-use std::{collections::HashSet, env, fmt::Debug, path::Path, time::Instant, vec};
-use tracing::{info, instrument, warn};
+use std::{
+    collections::HashSet,
+    env,
+    fmt::Debug,
+    path::Path,
+    time::{Duration, Instant},
+    vec,
+};
+use tracing::{debug, info, instrument, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CognitiveTask {
@@ -80,6 +87,16 @@ pub struct LLMResolver {
     api_url: String,
     api_key: String,
     model_name: String,
+    #[serde(default)]
+    provider: Option<LLMProvider>,
+}
+
+impl LLMResolver {
+    fn provider(&self) -> LLMProvider {
+        self.provider
+            .clone()
+            .unwrap_or_else(|| LLMProvider::infer_from_api_url(&self.api_url))
+    }
 }
 
 impl CognitiveSpaceWithMemory {
@@ -126,13 +143,19 @@ impl CognitiveSpaceWithMemory {
             panic!("The number of base_api_urls, models, and secret_keys must be the same.");
         }
 
+        let providers = resolvers
+            .iter()
+            .map(|resolver| resolver.provider())
+            .collect::<Vec<_>>();
+
         let computation_units = (0..base_api_urls.len())
             .map(|i| {
                 let base_api = base_api_urls[i].clone();
                 let model_name = models[i].clone();
                 let secret_key = secret_keys[i].clone();
+                let provider = providers[i].clone();
 
-                (base_api, model_name, secret_key)
+                (base_api, model_name, secret_key, provider)
             })
             .collect::<Vec<_>>();
 
@@ -142,15 +165,23 @@ impl CognitiveSpaceWithMemory {
             return telemetry;
         }
 
-        // println!("computation_units: {:?}", computation_units);
+        let chunk_width = computation_units.len();
+        info!(
+            units_total = nodes.len(),
+            resolver_count = computation_units.len(),
+            max_in_flight_requests = chunk_width,
+            "distributed_step_started"
+        );
 
         let mut pb: kdam::Bar = tqdm!(total = nodes.len());
 
-        for chunk in nodes.chunks(computation_units.len()) {
+        for chunk in nodes.chunks(chunk_width) {
+            let chunk_started_at = Instant::now();
             telemetry.record_chunk();
             let mut tasks = vec![];
 
             for (i, &node) in chunk.iter().enumerate() {
+                let resolver_index = i % computation_units.len();
                 let neighbors = self
                     .graph
                     .neighbors(node)
@@ -167,9 +198,10 @@ impl CognitiveSpaceWithMemory {
                 let unit = self.graph.node_weight_mut(node).unwrap().clone();
                 let ctx = CognitiveContext {
                     client: Box::new(Client::new()),
-                    base_api: computation_units[i].0.to_string(),
-                    model_name: computation_units[i].1.to_string(),
-                    secret_key: computation_units[i].2.to_string(),
+                    base_api: computation_units[resolver_index].0.to_string(),
+                    model_name: computation_units[resolver_index].1.to_string(),
+                    secret_key: computation_units[resolver_index].2.to_string(),
+                    provider: computation_units[resolver_index].3.clone(),
                 };
 
                 tasks.push(tokio::spawn(async move {
@@ -210,6 +242,14 @@ impl CognitiveSpaceWithMemory {
 
                 pb.update(1).ok();
             }
+
+            log_slow_chunk(
+                chunk.len(),
+                chunk_started_at.elapsed(),
+                telemetry.chunks,
+                telemetry.units_completed,
+                telemetry.units_total,
+            );
         }
 
         telemetry.finish(started_at.elapsed(), self.unique_state_count());
@@ -376,11 +416,42 @@ pub fn build_lattice_with_memory(
     }
 }
 
+fn log_slow_chunk(
+    chunk_units: usize,
+    elapsed: Duration,
+    chunk_index: usize,
+    units_completed: usize,
+    units_total: usize,
+) {
+    let elapsed_ms = elapsed.as_millis() as u64;
+
+    if elapsed_ms >= 5_000 {
+        info!(
+            chunk_index,
+            chunk_units,
+            units_completed,
+            units_total,
+            elapsed_ms,
+            "distributed_step_chunk_completed"
+        );
+    } else {
+        debug!(
+            chunk_index,
+            chunk_units,
+            units_completed,
+            units_total,
+            elapsed_ms,
+            "distributed_step_chunk_completed"
+        );
+    }
+}
+
 pub fn load_llm_resolvers_from_env() -> Vec<LLMResolver> {
     let base_api_urls =
         env::var("OPENAI_API_URL").unwrap_or("http://localhost:11434/v1".to_string());
     let models = env::var("OPENAI_MODEL_NAME").unwrap_or("phi3".to_string());
     let secret_keys = env::var("OPENAI_API_KEY").unwrap_or("ollama".to_string());
+    let providers = env::var("OPENAI_PROVIDER").ok();
 
     let base_api_urls = base_api_urls
         .split(',')
@@ -390,20 +461,39 @@ pub fn load_llm_resolvers_from_env() -> Vec<LLMResolver> {
     let models = models.split(',').map(|s| s.trim()).collect::<Vec<_>>();
 
     let secret_keys = secret_keys.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+    let providers = providers.map(|providers| {
+        providers
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect::<Vec<_>>()
+    });
 
     if base_api_urls.len() != models.len() || models.len() != secret_keys.len() {
         panic!("The number of base_api_urls, models, and secret_keys must be the same.");
     }
 
+    if let Some(providers) = &providers {
+        if providers.len() != base_api_urls.len() {
+            panic!("The number of providers must match the number of base_api_urls.");
+        }
+    }
+
     base_api_urls
         .iter()
+        .enumerate()
         .zip(models.iter())
         .zip(secret_keys.iter())
-        .map(|((base_api, model_name), secret_key)| LLMResolver {
-            api_url: base_api.to_string(),
-            model_name: model_name.to_string(),
-            api_key: secret_key.to_string(),
-        })
+        .map(
+            |(((index, base_api), model_name), secret_key)| LLMResolver {
+                api_url: base_api.to_string(),
+                model_name: model_name.to_string(),
+                api_key: secret_key.to_string(),
+                provider: providers
+                    .as_ref()
+                    .and_then(|providers| LLMProvider::parse(&providers[index]))
+                    .or_else(|| Some(LLMProvider::infer_from_api_url(base_api))),
+            },
+        )
         .collect()
 }
 

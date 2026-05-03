@@ -50,15 +50,23 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
    Create a `resolvers.toml` file in the project root:
    ```toml
    [[resolvers]]
-   api_url = "http://localhost:11434/v1"
-   model_name = "phi3"
-   api_key = "ollama"
+   provider = "ollama"
+   api_url = "http://localhost:11434"
+   model_name = "llama3.2"
+   api_key = "_"
 
    [[resolvers]]
-   api_url = "http://localhost:11435/v1"
-   model_name = "llama2"
-   api_key = "ollama"
+   provider = "openrouter"
+   api_url = "https://openrouter.ai/api/v1"
+   model_name = "deepseek/deepseek-r1-distill-qwen-1.5b"
+   api_key = "your_key"
    ```
+
+   `provider` is optional for older configs. If omitted, URLs containing
+   `openrouter` use the OpenRouter provider; all other URLs default to Ollama.
+   Ollama URLs may be written as `http://localhost:11434` or the legacy
+   OpenAI-compatible `http://localhost:11434/v1`; the native Rig adapter will
+   normalize the latter.
 
    **Option B: Environment Variables**
 
@@ -67,6 +75,7 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
    OPENAI_API_URL="http://your_api_url:port/v1" # Comma-separated for multiple APIs
    OPENAI_MODEL_NAME="your_model_name" # Comma-separated for multiple models
    OPENAI_API_KEY="your_api_key" # Comma-separated for multiple keys
+   OPENAI_PROVIDER="ollama" # Optional, comma-separated: ollama or openrouter
    ```
    If using multiple APIs, ensure the number of URLs, model names, and API keys match.
 
@@ -85,6 +94,16 @@ RUST_LOG=info cargo run -p minimal-ui
 Each completed evolution step logs unit count, resolver count, chunks,
 unique-state count, parse failures, LLM transport failures, and elapsed time.
 The API also returns the same telemetry from `POST /api/entity/:id/evolve`.
+`minimal-ui` skips saved entity restore on startup and logs manager/entity setup
+duration separately. Slow evolution chunks are logged at `info`; fast chunks are
+logged at `debug`.
+
+Model calls use [Rig](https://docs.rs/rig-core/latest/rig/#model-providers)
+instead of a hand-built chat-completions request. Ollama uses Rig's typed
+structured output path, which sends the `CognitiveUnitPair` JSON schema through
+Ollama's native `format` parameter. OpenRouter uses Rig's extractor/tool path
+because Rig 0.36 does not yet map its generic `output_schema` field to
+OpenRouter's native `response_format`.
 
 Raw model responses are available behind a targeted debug filter so normal runs
 avoid high-volume logging and formatting overhead:
@@ -95,6 +114,9 @@ RUST_LOG=info,llmca::model_response=debug cargo run -p minimal-ui
 
 Do not enable `llmca::model_response=debug` when prompts or model outputs may
 contain sensitive data. API keys are never emitted by the structured logs.
+
+Max in-flight completion requests equals the number of resolvers in
+`resolvers.toml`. For example, 4 resolvers means 4 concurrent completion calls.
 
 ## Simulation Example
 

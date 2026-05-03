@@ -1,8 +1,9 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 
 use super::entity::Entity;
 use crate::system::space::{load_llm_resolvers_from_toml, LLMResolver};
 use serde_derive::{Deserialize, Serialize};
+use tracing::{debug, info};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LifeManager {
@@ -13,13 +14,26 @@ pub struct LifeManager {
 
 impl Default for LifeManager {
     fn default() -> Self {
+        Self::new(true)
+    }
+}
+
+impl LifeManager {
+    pub fn new(load_entities: bool) -> Self {
+        let started_at = Instant::now();
         let root_folder = PathBuf::from(".life");
 
         if !root_folder.exists() {
             std::fs::create_dir(&root_folder).unwrap();
         }
 
+        let resolver_started_at = Instant::now();
         let resolvers = load_llm_resolvers_from_toml("resolvers.toml");
+        debug!(
+            resolver_count = resolvers.len(),
+            elapsed_ms = resolver_started_at.elapsed().as_millis() as u64,
+            "life_manager_resolvers_loaded"
+        );
 
         let mut instance = Self {
             root_folder,
@@ -27,19 +41,40 @@ impl Default for LifeManager {
             loaded_entities: vec![],
         };
 
-        instance.list_entities().iter().for_each(|entity_folder| {
-            let folder_name = instance.root_folder.join(entity_folder.clone());
-            println!("Loading entity from {:?}", folder_name);
+        if load_entities {
+            let entity_folders = instance.list_entities();
 
-            let entity = Entity::open_saved(folder_name, instance.clone());
-            instance.loaded_entities.push(entity);
-        });
+            for entity_folder in entity_folders {
+                let entity_started_at = Instant::now();
+                let folder_name = instance.root_folder.join(&entity_folder);
+                debug!(entity_folder = %entity_folder, "life_manager_loading_entity");
+
+                let entity = Entity::open_saved(folder_name, instance.clone());
+                instance.loaded_entities.push(entity);
+
+                debug!(
+                    entity_folder = %entity_folder,
+                    elapsed_ms = entity_started_at.elapsed().as_millis() as u64,
+                    "life_manager_entity_loaded"
+                );
+            }
+        }
+
+        info!(
+            loaded_entities = instance.loaded_entities.len(),
+            resolver_count = instance.resolvers.len(),
+            load_entities,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "life_manager_initialized"
+        );
 
         instance
     }
-}
 
-impl LifeManager {
+    pub fn without_loaded_entities() -> Self {
+        Self::new(false)
+    }
+
     pub fn root_folder(&self) -> &PathBuf {
         &self.root_folder
     }

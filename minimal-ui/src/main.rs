@@ -5,6 +5,7 @@ use dynamical_system::{
 };
 use itertools::Itertools;
 use macroquad::prelude::*;
+use std::time::Instant;
 use tracing_subscriber::EnvFilter;
 
 fn window_conf() -> Conf {
@@ -20,10 +21,16 @@ fn window_conf() -> Conf {
 async fn main() {
     dotenv().ok();
     init_tracing();
+    let startup_started_at = Instant::now();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let manager = LifeManager::default();
+    let manager_started_at = Instant::now();
+    let manager = LifeManager::without_loaded_entities();
+    tracing::info!(
+        elapsed_ms = manager_started_at.elapsed().as_millis() as u64,
+        "minimal_ui_manager_ready"
+    );
 
     let size = (5, 5);
 
@@ -38,7 +45,16 @@ async fn main() {
 
     let temporal_memory_size = 4;
 
+    let entity_started_at = Instant::now();
     let mut entity = Entity::new_2d_lattice(&manager, initial_state, size, temporal_memory_size);
+    tracing::info!(
+        entity_id = entity.id(),
+        size_x = size.0,
+        size_y = size.1,
+        elapsed_ms = entity_started_at.elapsed().as_millis() as u64,
+        startup_elapsed_ms = startup_started_at.elapsed().as_millis() as u64,
+        "minimal_ui_entity_ready"
+    );
 
     loop {
         let unique_states = entity.calculate_unique_states();
@@ -86,9 +102,10 @@ fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let _ = tracing_subscriber::fmt()
+        .pretty()
         .with_env_filter(filter)
         .with_target(true)
-        .json()
+        // .json()
         .try_init();
 }
 
