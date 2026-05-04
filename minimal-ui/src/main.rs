@@ -32,7 +32,7 @@ async fn main() {
         "minimal_ui_manager_ready"
     );
 
-    let size = (5, 5);
+    let size = (10, 10);
 
     let initial_state = (0..size.0)
         .cartesian_product(0..size.1)

@@ -1,7 +1,6 @@
 use chrono::Utc;
 // use futures::{stream, StreamExt};
 use itertools::Itertools;
-use kdam::{tqdm, BarExt};
 use petgraph::{stable_graph::StableGraph, Undirected};
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
@@ -173,8 +172,6 @@ impl CognitiveSpaceWithMemory {
             "distributed_step_started"
         );
 
-        let mut pb: kdam::Bar = tqdm!(total = nodes.len());
-
         for chunk in nodes.chunks(chunk_width) {
             let chunk_started_at = Instant::now();
             telemetry.record_chunk();
@@ -239,8 +236,6 @@ impl CognitiveSpaceWithMemory {
 
                 telemetry.record_unit(&next_state);
                 unit.add_memory(next_state);
-
-                pb.update(1).ok();
             }
 
             log_slow_chunk(
