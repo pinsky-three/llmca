@@ -2,9 +2,9 @@ use chrono::Utc;
 // use futures::{stream, StreamExt};
 use itertools::Itertools;
 use petgraph::{stable_graph::StableGraph, Undirected};
-use rand::rngs::StdRng;
+use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Client;
 
 use serde_derive::{Deserialize, Serialize};
@@ -109,8 +109,8 @@ impl CognitiveSpaceWithMemory {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
         let mut telemetry = StepTelemetry::new(nodes.len(), resolvers.len());
 
-        // let mut rng = ThreadRng::default();
-        let mut rng = StdRng::from_os_rng();
+        let mut rng = ThreadRng::default();
+        let mut rng = StdRng::from_rng(&mut rng);
 
         nodes.shuffle(&mut rng);
 
