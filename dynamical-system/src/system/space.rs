@@ -109,8 +109,14 @@ impl CognitiveSpaceWithMemory {
         let mut nodes = self.graph.clone().node_indices().collect::<Vec<_>>();
         let mut telemetry = StepTelemetry::new(nodes.len(), resolvers.len());
 
-        let mut rng = ThreadRng::default();
-        let mut rng = StdRng::from_rng(&mut rng);
+        // Seed a Send-able StdRng from the thread-local RNG inside a tight
+        // scope so the !Send `ThreadRng` is dropped before any `.await` and
+        // the resulting future stays `Send` (required by `tokio::spawn` and
+        // poem's `#[OpenApi]` handlers).
+        let mut rng = {
+            let mut thread_rng = ThreadRng::default();
+            StdRng::from_rng(&mut thread_rng)
+        };
 
         nodes.shuffle(&mut rng);
 
