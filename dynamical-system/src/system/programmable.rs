@@ -191,14 +191,25 @@ pub fn program_authoring_system_prompt() -> String {
          - Keep the body under 30 lines. Pure arithmetic and list comprehensions are fine.\n\
          - Do NOT raise exceptions; handle empty `neighbors` gracefully.\n\
          \n\
-         GOAL — produce a rule that yields visually interesting *dynamics*: spreading\n\
-         waves, gradients, oscillations, glider-like shapes, gradients, etc. Avoid trivial\n\
-         identity rules unless asked.\n\
+         GOAL — produce visually interesting *dynamics*. Pure averaging produces a\n\
+         boring heat-equation blur and is DISCOURAGED. Aim for one of:\n\
+         - oscillation: use `step_index % k` to flip channels periodically\n\
+         - threshold logic: count how many neighbors exceed a threshold (Conway-like)\n\
+         - reaction-diffusion: average + nonlinear feedback (e.g. amplify variance)\n\
+         - phase shifts: `(c + step_index * 7) % 256` for travelling color waves\n\
+         - spatial structure: use the cell's own state as a seed for asymmetric updates\n\
+         Combine at least one of these with neighbor information. NO pure linear blends.\n\
          \n\
-         EXAMPLE (good):\n\
+         EXAMPLE 1 — travelling wave + neighbor coupling:\n\
          {{\n\
-           \"rule\": \"smooth toward the average of neighbors with a slow red drift\",\n\
-           \"code\": \"def step(state, neighbors, step_index):\\n    if not neighbors:\\n        return state\\n    n = len(neighbors)\\n    ar = sum(c[0] for c in neighbors) // n\\n    ag = sum(c[1] for c in neighbors) // n\\n    ab = sum(c[2] for c in neighbors) // n\\n    r = min(255, (state[0] + ar) // 2 + 1)\\n    g = max(0, (state[1] + ag) // 2)\\n    b = max(0, (state[2] + ab) // 2)\\n    return (r, g, b)\\n\"\n\
+           \"rule\": \"travelling phase wave coupled to neighbor minimum\",\n\
+           \"code\": \"def step(state, neighbors, step_index):\\n    if not neighbors:\\n        return state\\n    nmin = min(c[2] for c in neighbors)\\n    r = (state[0] + 7 * step_index) % 256\\n    g = (state[1] + (nmin // 8)) % 256\\n    b = (nmin + 3) % 256\\n    return (r, g, b)\\n\"\n\
+         }}\n\
+         \n\
+         EXAMPLE 2 — threshold (Conway-flavoured) on the red channel:\n\
+         {{\n\
+           \"rule\": \"red channel obeys a 2/3 majority threshold; greens drift\",\n\
+           \"code\": \"def step(state, neighbors, step_index):\\n    hot = sum(1 for c in neighbors if c[0] > 127)\\n    r = 255 if hot >= 5 else (state[0] // 2)\\n    g = (state[1] + 13) % 256\\n    b = max(0, state[2] - 1)\\n    return (r, g, b)\\n\"\n\
          }}\n"
     )
 }
@@ -244,11 +255,22 @@ pub async fn propose_program(
     Ok(first)
 }
 
+/// Sampling temperature for program authoring. Read from `LLMCA_TEMP` (default
+/// 0.7). Higher values yield more diverse code; lower values are deterministic.
+fn sampling_temperature() -> f64 {
+    std::env::var("LLMCA_TEMP")
+        .ok()
+        .and_then(|v| v.trim().parse::<f64>().ok())
+        .map(|v| v.clamp(0.0, 2.0))
+        .unwrap_or(0.7)
+}
+
 async fn call_llm_for_program(
     ctx: &CognitiveContext,
     system_prompt: &str,
     user_message: &str,
 ) -> Result<CellProgram, String> {
+    let temperature = sampling_temperature();
     match ctx.provider {
         LLMProvider::Ollama => {
             let base_url = normalize_ollama_base_url(&ctx.base_api);
@@ -270,7 +292,7 @@ async fn call_llm_for_program(
             let agent = client
                 .agent(&ctx.model_name)
                 .preamble(system_prompt)
-                .temperature(0.2)
+                .temperature(temperature)
                 .build();
             let response = agent
                 .prompt_typed::<CellProgram>(user_message.to_string())
@@ -286,7 +308,7 @@ async fn call_llm_for_program(
             // (e.g. DeepInfra) include — `cost`, `native_finish_reason`,
             // `cost_details`, etc. A direct OpenAI-compatible call with
             // `response_format=json_object` is both simpler and more robust.
-            openrouter_json_object_request(ctx, system_prompt, user_message).await
+            openrouter_json_object_request(ctx, system_prompt, user_message, temperature).await
         }
     }
 }
@@ -298,12 +320,13 @@ async fn openrouter_json_object_request(
     ctx: &CognitiveContext,
     system_prompt: &str,
     user_message: &str,
+    temperature: f64,
 ) -> Result<CellProgram, String> {
     let url = format!("{}/chat/completions", ctx.base_api.trim_end_matches('/'));
 
     let body = json!({
         "model": ctx.model_name,
-        "temperature": 0.2,
+        "temperature": temperature,
         "max_tokens": 1024,
         "response_format": { "type": "json_object" },
         "messages": [

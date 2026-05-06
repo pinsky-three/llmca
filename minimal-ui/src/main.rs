@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tracing_subscriber::EnvFilter;
 
-const GRID_SIZE: (usize, usize) = (3, 3);
+const DEFAULT_GRID_SIZE: usize = 3;
 const DEFAULT_RULE: &str =
     "spreading sunset: blend with neighbors and slowly drift toward warm colors";
 /// Where per-cell programs are dumped. One file per (step, x, y).
@@ -61,10 +61,22 @@ async fn main() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let (n, m) = GRID_SIZE;
+    let grid = env_usize("LLMCA_GRID").unwrap_or(DEFAULT_GRID_SIZE).max(1);
+    let (n, m) = (grid, grid);
+    let base_rule = std::env::var("LLMCA_RULE").unwrap_or_else(|_| DEFAULT_RULE.to_string());
+    let per_cell_rule = env_flag("LLMCA_PER_CELL_RULE");
+    let fresh_programs = env_flag("LLMCA_FRESH_PROGRAMS");
+
     let mut cells: Vec<Cell> = (0..n)
         .cartesian_product(0..m)
-        .map(|(x, y)| Cell::new_with_rule(DEFAULT_RULE.to_string(), seed_color((x, y), (n, m))))
+        .map(|(x, y)| {
+            let rule = if per_cell_rule {
+                format!("{base_rule} | cell ({x},{y}) — express your own micro-variant")
+            } else {
+                base_rule.clone()
+            };
+            Cell::new_with_rule(rule, seed_color((x, y), (n, m)))
+        })
         .collect();
 
     let llm_disabled = env_flag("LLMCA_NO_LLM");
@@ -99,6 +111,9 @@ async fn main() {
         m,
         resolvers = resolvers.len(),
         dump_dir = %dump_dir.display(),
+        per_cell_rule,
+        fresh_programs,
+        temperature = std::env::var("LLMCA_TEMP").unwrap_or_else(|_| "0.7 (default)".into()),
         startup_elapsed_ms = startup_started_at.elapsed().as_millis() as u64,
         "minimal_ui_ready"
     );
@@ -144,6 +159,7 @@ async fn main() {
                 step_index,
                 (n, m),
                 Some(&dump_dir),
+                fresh_programs,
             ))
         } else {
             local_evolve_step(&mut cells, step_index, (n, m))
@@ -178,6 +194,7 @@ async fn llm_evolve_step(
     step_index: u32,
     (n, m): (usize, usize),
     dump_dir: Option<&Path>,
+    fresh_programs: bool,
 ) -> StepTelemetry {
     let total = cells.len();
     let snapshot: Vec<Rgb> = cells.iter().map(|c| c.color).collect();
@@ -206,6 +223,9 @@ async fn llm_evolve_step(
                 current_color,
                 &neighbors_rgb,
                 step_index,
+                (x, y),
+                (n, m),
+                fresh_programs,
             );
 
             tasks.push(tokio::spawn(async move {
@@ -288,32 +308,45 @@ fn local_evolve_step(
     t
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_per_cell_instruction(
     rule: &str,
     current_program: &CellProgram,
     current_color: Rgb,
     neighbors: &[Rgb],
     step_index: u32,
+    (x, y): (usize, usize),
+    (n, m): (usize, usize),
+    fresh_programs: bool,
 ) -> String {
     let neighbors_repr = neighbors
         .iter()
         .map(|n| format!("({}, {}, {})", n.r, n.g, n.b))
         .collect::<Vec<_>>()
         .join(", ");
+    let previous_block = if fresh_programs {
+        String::from("Previous program: <hidden — author a fresh program from scratch>\n")
+    } else {
+        format!(
+            "Previous program:\n```python\n{}```\n",
+            current_program.code
+        )
+    };
     format!(
         "Cell rule (keep consistent across ticks): {rule}\n\
+         position (x,y): ({x}, {y}) on a {n}x{m} toroidal grid\n\
          step_index: {step_index}\n\
          current_color (r,g,b): ({cr}, {cg}, {cb})\n\
          neighbor_colors: [{neighbors_repr}]\n\
          \n\
-         Previous program:\n\
-         ```python\n{prev_code}```\n\
+         {previous_block}\
          \n\
-         Author the next CellProgram. You may keep `code` identical if it already produces interesting dynamics, or refine it. Return JSON only.",
+         Author the next CellProgram. Push for *non-trivial* dynamics — pure averaging is\n\
+         discouraged. Use step_index, position, threshold logic, or modular arithmetic to\n\
+         create motion. Return JSON only.",
         cr = current_color.r,
         cg = current_color.g,
         cb = current_color.b,
-        prev_code = current_program.code,
     )
 }
 
@@ -417,6 +450,10 @@ fn demo_program() -> CellProgram {
 "#
         .to_string(),
     }
+}
+
+fn env_usize(name: &str) -> Option<usize> {
+    std::env::var(name).ok().and_then(|v| v.trim().parse().ok())
 }
 
 fn env_flag(name: &str) -> bool {
