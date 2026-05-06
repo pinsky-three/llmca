@@ -20,3 +20,6 @@ chrono = { version = "0.4.44", features = ["serde"] }
 toml = "1.1.2+spec-1.1.0"
 tracing = "0.1.44"
 rig-core = "0.36.0"
+# `monty` is not yet on crates.io — pinned to a tag.
+# Sandboxed Python interpreter used to execute LLM-authored `step` programs per cell.
+monty = { git = "https://github.com/pydantic/monty.git", tag = "v0.0.17" }

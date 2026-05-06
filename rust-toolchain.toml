@@ -1,0 +1,5 @@
+[toolchain]
+# Required by `monty` (pydantic/monty) which depends on ruff main and needs >= 1.95.
+channel = "1.95"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

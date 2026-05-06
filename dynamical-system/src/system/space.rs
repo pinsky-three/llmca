@@ -96,6 +96,19 @@ impl LLMResolver {
             .clone()
             .unwrap_or_else(|| LLMProvider::infer_from_api_url(&self.api_url))
     }
+
+    /// Build a `CognitiveContext` for ad-hoc one-off LLM calls (e.g. seeding
+    /// programmable cells from a separate binary). Keeps resolver internals
+    /// private to this crate.
+    pub fn to_cognitive_context(&self) -> CognitiveContext {
+        CognitiveContext {
+            client: Box::new(Client::new()),
+            base_api: self.api_url.clone(),
+            model_name: self.model_name.clone(),
+            secret_key: self.api_key.clone(),
+            provider: self.provider(),
+        }
+    }
 }
 
 impl CognitiveSpaceWithMemory {
@@ -504,6 +517,32 @@ pub fn load_llm_resolvers_from_toml<P: AsRef<Path>>(path: P) -> Vec<LLMResolver>
     let resolvers: TomlConfig = toml::from_str(&toml).unwrap();
 
     resolvers.resolvers
+}
+
+/// Default resolver loader used by binaries.
+///
+/// Cascade: prefer `./resolvers.toml` (matches `LifeManager`), otherwise fall
+/// back to `OPENAI_*` env vars. Logs which source was used so misconfigurations
+/// are loud, not silent.
+pub fn load_llm_resolvers() -> Vec<LLMResolver> {
+    let toml_path = Path::new("resolvers.toml");
+    if toml_path.exists() {
+        let resolvers = load_llm_resolvers_from_toml(toml_path);
+        info!(
+            source = "resolvers.toml",
+            resolver_count = resolvers.len(),
+            "llm_resolvers_loaded"
+        );
+        return resolvers;
+    }
+
+    let resolvers = load_llm_resolvers_from_env();
+    info!(
+        source = "env",
+        resolver_count = resolvers.len(),
+        "llm_resolvers_loaded"
+    );
+    resolvers
 }
 
 #[derive(Serialize, Deserialize, Debug)]
