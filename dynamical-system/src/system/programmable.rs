@@ -7,7 +7,8 @@
 //! "produce a typed Python function" lets us measure expressiveness, stability
 //! and correctness with concrete, executable artifacts.
 
-use monty::{MontyObject, MontyRun, NoLimitTracker, PrintWriter};
+pub use monty::MontyRun;
+use monty::{MontyObject, NoLimitTracker, PrintWriter};
 use reqwest::Client as HttpClient;
 use rig::{
     client::{CompletionClient, Nothing},
@@ -145,6 +146,31 @@ impl CellProgram {
             .ok_or_else(|| format!("step() must return (r,g,b) ints, got: {result:?}"))
     }
 
+    /// Parse the program once and return a reusable runner. Cheap (microseconds)
+    /// but worth caching if you'll execute it for many cells in a hot loop.
+    pub fn compile(&self) -> Result<MontyRun, String> {
+        Self::compile_runner(&self.code)
+    }
+
+    /// Execute a previously-compiled runner. The runner can be reused freely.
+    pub fn run_compiled(
+        runner: &MontyRun,
+        state: Rgb,
+        neighbors: &[Rgb],
+        step_index: u32,
+    ) -> Result<Rgb, String> {
+        let inputs = vec![
+            state.to_monty(),
+            MontyObject::List(neighbors.iter().map(|n| n.to_monty()).collect()),
+            MontyObject::Int(step_index as i64),
+        ];
+        let result = runner
+            .run(inputs, NoLimitTracker, PrintWriter::Disabled)
+            .map_err(|e| format!("monty runtime error: {e}"))?;
+        Rgb::from_monty(&result)
+            .ok_or_else(|| format!("step() must return (r,g,b) ints, got: {result:?}"))
+    }
+
     fn compile_runner(code: &str) -> Result<MontyRun, String> {
         // We append a single trailing call so the script's last expression is
         // `step(...)` — Monty returns the value of the last expression.
@@ -164,11 +190,17 @@ impl CellProgram {
 
 /// System prompt with hard constraints. Keep it short, explicit and example-led
 /// — that's what reliably yields well-typed `def step` from current models.
+///
+/// The prompt is pinned around the cellular-automata state of the art so the
+/// model picks one *named* family (Lenia, Gray-Scott, cyclic CA, Brian's
+/// Brain) and implements it cleanly, instead of inventing a boring averaging
+/// rule. This is what produces the visible dynamics the human cares about.
 pub fn program_authoring_system_prompt() -> String {
     let schema = CellProgram::self_description();
     format!(
-        "You are an LLM Cognitive Unit authoring ONE Python function for a 2D cellular automaton.\n\
-         Each cell calls `step` every tick to compute its next RGB color.\n\
+        "You are designing ONE Python `step` function that drives EVERY cell of a 2D continuous cellular automaton.\n\
+         The same function will execute thousands of times across a toroidal grid. Variety must come from the\n\
+         TEMPORAL EVOLUTION of one good rule, NOT from per-cell variation.\n\
          \n\
          OUTPUT — return ONLY a JSON object matching this schema (no prose, no markdown):\n\
          ```json\n{schema}\n```\n\
@@ -176,41 +208,53 @@ pub fn program_authoring_system_prompt() -> String {
          The `code` field MUST define exactly:\n\
          \n\
          def step(state, neighbors, step_index):\n\
-             # state: tuple[int, int, int]                  -- this cell's RGB, channels 0..=255\n\
-             # neighbors: list[tuple[int, int, int]]        -- 8 neighbors' RGBs (Moore neighborhood)\n\
+             # state: tuple[int, int, int]                  -- this cell's current RGB (0..=255)\n\
+             # neighbors: list[tuple[int, int, int]]        -- 8 Moore neighbors' RGBs\n\
              # step_index: int                              -- monotonically increasing tick counter\n\
-             # returns: tuple[int, int, int]                -- next RGB, channels 0..=255\n\
+             # returns: tuple[int, int, int]                -- next RGB (0..=255)\n\
              ...\n\
          \n\
-         HARD CONSTRAINTS (failure to follow these breaks the simulation):\n\
-         - Define a single top-level function called `step` with the exact signature above.\n\
-         - Always return a 3-tuple of ints in 0..=255. Clamp aggressively.\n\
-         - Pure function: no I/O, no `print`, no `input`, no network, no filesystem, no env.\n\
-         - No `import` statements. No `class`. No `match` statements.\n\
+         HARD CONSTRAINTS:\n\
+         - Single top-level `def step` with the exact signature above. Return 3-tuple of ints in 0..=255.\n\
+         - Pure function. No I/O, no `print`, no `import`, no `class`, no `match`, no exceptions.\n\
          - Allowed builtins only: len, range, sum, min, max, abs, int, float, round, sorted, enumerate, zip, any, all.\n\
-         - Keep the body under 30 lines. Pure arithmetic and list comprehensions are fine.\n\
-         - Do NOT raise exceptions; handle empty `neighbors` gracefully.\n\
+         - Body under 35 lines. Handle empty `neighbors` gracefully.\n\
+         - For exp/sqrt etc., approximate with arithmetic — `2.71828 ** x` for exp, `x ** 0.5` for sqrt.\n\
          \n\
-         GOAL — produce visually interesting *dynamics*. Pure averaging produces a\n\
-         boring heat-equation blur and is DISCOURAGED. Aim for one of:\n\
-         - oscillation: use `step_index % k` to flip channels periodically\n\
-         - threshold logic: count how many neighbors exceed a threshold (Conway-like)\n\
-         - reaction-diffusion: average + nonlinear feedback (e.g. amplify variance)\n\
-         - phase shifts: `(c + step_index * 7) % 256` for travelling color waves\n\
-         - spatial structure: use the cell's own state as a seed for asymmetric updates\n\
-         Combine at least one of these with neighbor information. NO pure linear blends.\n\
+         DESIGN GUIDE — pick ONE archetype below and implement it correctly. Do NOT mix archetypes.\n\
+         Pure averaging or 'blend toward neighbor mean with small drift' is the WORST possible choice — it\n\
+         relaxes to a flat field and produces no visible dynamics. AVOID.\n\
          \n\
-         EXAMPLE 1 — travelling wave + neighbor coupling:\n\
-         {{\n\
-           \"rule\": \"travelling phase wave coupled to neighbor minimum\",\n\
-           \"code\": \"def step(state, neighbors, step_index):\\n    if not neighbors:\\n        return state\\n    nmin = min(c[2] for c in neighbors)\\n    r = (state[0] + 7 * step_index) % 256\\n    g = (state[1] + (nmin // 8)) % 256\\n    b = (nmin + 3) % 256\\n    return (r, g, b)\\n\"\n\
-         }}\n\
+         (1) LENIA  (Chan, 2019) — continuous CA with smooth growth function.\n\
+              update:    A_next = clip01(A + dt * G(K))\n\
+              kernel:    K = mean of neighbor channel value, scaled to [0,1]\n\
+              growth:    G(u) = 2*exp(-((u-mu)**2)/(2*sigma**2)) - 1\n\
+              params:    mu in [0.1, 0.5], sigma in [0.02, 0.15], dt in [0.05, 0.3]\n\
+              good for:  gliders, solitons, breathing patterns\n\
          \n\
-         EXAMPLE 2 — threshold (Conway-flavoured) on the red channel:\n\
-         {{\n\
-           \"rule\": \"red channel obeys a 2/3 majority threshold; greens drift\",\n\
-           \"code\": \"def step(state, neighbors, step_index):\\n    hot = sum(1 for c in neighbors if c[0] > 127)\\n    r = 255 if hot >= 5 else (state[0] // 2)\\n    g = (state[1] + 13) % 256\\n    b = max(0, state[2] - 1)\\n    return (r, g, b)\\n\"\n\
-         }}\n"
+         (2) GRAY-SCOTT REACTION-DIFFUSION — chemical patterns: spots, stripes, mitosis.\n\
+              encode u in red channel /255, v in blue /255.\n\
+              du/dt = Du*(mean_u - u) - u*v*v + F*(1 - u)\n\
+              dv/dt = Dv*(mean_v - v) + u*v*v - (F + k)*v\n\
+              params:  F=0.04, k=0.06 (mitosis) | F=0.022, k=0.051 (worms) | F=0.06, k=0.062 (stripes)\n\
+              Du=1.0, Dv=0.5, dt=1.0\n\
+         \n\
+         (3) CYCLIC CA  (Bramson-Griffeath) — produces spiral waves.\n\
+              N states (try N=12). Encode state as red_channel * N // 256.\n\
+              cell with state s -> (s+1) mod N if any neighbor already has state (s+1) mod N, else s.\n\
+              Map state back to RGB via a colour wheel for visible spirals.\n\
+         \n\
+         (4) BRIAN'S BRAIN — 3-state with refractory period; many gliders.\n\
+              alive(red>200) -> dying(blue>200) -> dead(0,0,0) -> alive iff exactly 2 alive neighbors.\n\
+         \n\
+         EXAMPLE — Cyclic CA (12 states, RGB-encoded — produces SPIRAL WAVES):\n\
+         {{\"rule\": \"cyclic CA, N=12\", \"code\": \"def step(state, neighbors, step_index):\\n    N = 12\\n    s = (state[0] * N) // 256\\n    succ = (s + 1) % N\\n    next_s = s\\n    for c in neighbors:\\n        ns = (c[0] * N) // 256\\n        if ns == succ:\\n            next_s = succ\\n            break\\n    v = (next_s * 255) // (N - 1)\\n    return (v, (v + 80) % 256, (255 - v))\\n\"}}\n\
+         \n\
+         EXAMPLE — Lenia-flavoured single-channel growth (gliders):\n\
+         {{\"rule\": \"Lenia growth on red, mu=0.35 sigma=0.07\", \"code\": \"def step(state, neighbors, step_index):\\n    if not neighbors:\\n        return state\\n    K = sum(c[0] for c in neighbors) / (255.0 * len(neighbors))\\n    mu, sigma, dt = 0.35, 0.07, 0.15\\n    G = 2.0 * (2.71828 ** (-((K - mu) ** 2) / (2 * sigma * sigma))) - 1.0\\n    u = state[0] / 255.0\\n    new_u = max(0.0, min(1.0, u + dt * G))\\n    r = int(new_u * 255)\\n    g = int((new_u * 0.6 + 0.2) * 255)\\n    b = int((1.0 - new_u) * 255)\\n    return (r, g, b)\\n\"}}\n\
+         \n\
+         EXAMPLE — Gray-Scott reaction-diffusion (mitosis F=0.04 k=0.06):\n\
+         {{\"rule\": \"Gray-Scott RD, mitosis preset\", \"code\": \"def step(state, neighbors, step_index):\\n    if not neighbors:\\n        return state\\n    n = len(neighbors)\\n    u = state[0] / 255.0\\n    v = state[2] / 255.0\\n    mu = sum(c[0] for c in neighbors) / (255.0 * n)\\n    mv = sum(c[2] for c in neighbors) / (255.0 * n)\\n    Du, Dv, F, k, dt = 1.0, 0.5, 0.04, 0.06, 1.0\\n    du = Du * (mu - u) - u * v * v + F * (1.0 - u)\\n    dv = Dv * (mv - v) + u * v * v - (F + k) * v\\n    nu = max(0.0, min(1.0, u + dt * du))\\n    nv = max(0.0, min(1.0, v + dt * dv))\\n    r = int(nu * 255)\\n    b = int(nv * 255)\\n    g = int((1.0 - nu) * (1.0 - nv) * 255)\\n    return (r, g, b)\\n\"}}\n"
     )
 }
 
