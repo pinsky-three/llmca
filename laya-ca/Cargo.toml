@@ -1,0 +1,28 @@
+[package]
+name = "laya-ca"
+version = "0.1.0"
+edition = "2021"
+description = "Cellular automaton whose pixels are Laya typed color decisions"
+license = "MIT"
+
+[features]
+default = []
+# Links the Laya candle runtime. Off by default so workspace builds stay light.
+infer = ["dep:laya", "dep:candle-core", "dep:candle-nn"]
+# Apple GPU. Use with infer: --features infer,metal
+metal = ["laya?/metal", "candle-core?/metal", "candle-nn?/metal", "dep:candle-metal-kernels"]
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+# candle-core 0.9.1 depends on metal kernels `0.9.1`, and Cargo treats that as
+# `^0.9.1`. 0.9.2 is not API-compatible with the 0.9.1 Metal backend.
+candle-core = { version = "=0.9.1", optional = true }
+candle-metal-kernels = { version = "=0.9.1", optional = true }
+candle-nn = { version = "=0.9.1", optional = true }
+# Local patch of laya adds `system_many` so a generation can share one forward.
+laya = { path = "../third_party/laya", optional = true }
+macroquad = "0.4.14"
+serde_json = "1.0.149"
+thiserror = "2"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }

@@ -81,6 +81,16 @@ LLMCA (Language Model Cellular Automata) is an experimental project that combine
 
 2. **Run:** `cargo run -p minimal-ui`
 
+## Laya cellular automaton
+
+[`laya-ca`](./laya-ca/README.md) is a second automaton. Each pixel asks [Laya](https://github.com/aovestdipaperino/laya-rust) — a local, non-autoregressive typed-decision model — which palette phrase it should show next. The model cannot emit free text, so the picture never depends on parsing a chat completion. Weights stay outside the repo. See the crate README for the checkpoint download and:
+
+```bash
+cargo run -p laya-ca --release --features infer,metal -- --model models/laya-typed
+```
+
+Without a checkpoint, `cargo run -p laya-ca -- --fake` paints each pixel as the majority of its neighbors.
+
 ## Observability
 
 Runtime binaries initialize structured JSON logs with `tracing-subscriber`.
