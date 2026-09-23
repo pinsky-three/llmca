@@ -2,6 +2,7 @@
 members = [
     "dynamical-system",
     "generate-artifacts",
+    "laya-ca",
     "minimal-ui",
     "observatory",
     "server",

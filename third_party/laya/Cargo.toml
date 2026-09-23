@@ -1,0 +1,32 @@
+[package]
+name = "laya"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Enzo Lombardi <enzinol@gmail.com>"]
+description = "Rust inference for the Laya non-autoregressive typed-decision model (ModernBERT-large + RL decision head)"
+repository = "https://github.com/aovestdipaperino/laya-rust"
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["nlp", "classification", "candle", "modernbert", "inference"]
+categories = ["science"]
+# Keep the package lean: the demo screenshots and the checkpoint stay in git / on the Hub.
+exclude = ["models/*", "examples/_*_tmp.rs"]
+
+[dependencies]
+candle-core = "=0.9.1"
+candle-nn = "=0.9.1"
+tokenizers = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"], optional = true }
+
+[features]
+default = []
+# The web console binary. Opt in: it pulls axum and tokio.
+serve = ["axum", "tokio"]
+metal = ["candle-core/metal", "candle-nn/metal"]
+cuda = ["candle-core/cuda", "candle-nn/cuda"]
